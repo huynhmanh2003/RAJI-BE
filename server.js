@@ -12,6 +12,7 @@ connectDB();
 app.use(cors());
 app.use(bodyParser.json());
 app.use("/api/auth", authRoutes);
+app.use("/api/boards", require("./api/boardRoutes"));
 
 // Lắng nghe server
 const PORT = process.env.PORT || 5000;
