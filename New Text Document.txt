@@ -1,0 +1,11 @@
+PORT=5000
+MONGO_URI=mongodb://localhost:27017/jwt-auth
+JWT_SECRET=RANDOM_LONG_SECRET_1234567890!@#$%^&*()
+
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
+
+
+//
+
+npm install express mongoose bcryptjs jsonwebtoken dotenv cors body-parser nodemailer
