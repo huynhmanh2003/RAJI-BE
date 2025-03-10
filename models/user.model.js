@@ -7,9 +7,12 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ["Admin", "Project Manager", "Leader"],
+    enum: ["Admin", "Project Manager", "Leader", "Member"],
     default: "Leader",
   },
+  boards: [
+    { type: mongoose.Schema.Types.ObjectId, ref: "Board", required: false },
+  ],
 });
 
 // Mã hóa mật khẩu trước khi lưu

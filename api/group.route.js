@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const { authentication } = require("../auth/auth.middleware");
 const asyncHandler = require("express-async-handler");
 const groupController = require("../controllers/group.controller");
+const authMiddleware = require("../middleware/auth.middleware");
 
-router.use(authentication);
+router.use(authMiddleware);
 
 router.get("/", asyncHandler(groupController.getAllGroups));
 router.get("/:id", asyncHandler(groupController.getGroup));

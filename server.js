@@ -3,11 +3,11 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const connectDB = require("./config/db");
-const authRoutes = require("./routes/authRoutes");
+const authRoutes = require("./api/authRoutes");
 const boardRoutes = require("./api/board.route");
-const groupRoutes = require("./routes/group.router");
-const taskRoutes = require("./routes/task.router");
-const commentRoutes = require("./routes/comment.router");
+const groupRoutes = require("./api/group.route");
+const taskRoutes = require("./api/task.route");
+const commentRoutes = require("./api/comment.route");
 
 const app = express();
 connectDB();
