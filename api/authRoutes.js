@@ -1,8 +1,9 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const User = require("../models/user.model");
 const transporter = require("../config/email"); // Import module gửi email
+const authMiddleware = require("../middleware/auth.middleware");
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET;
@@ -10,7 +11,7 @@ const SECRET_KEY = process.env.JWT_SECRET;
 //  Đăng ký tài khoản
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password, role } = req.body;
+    const { username, email, password, role, boards } = req.body;
 
     // Kiểm tra nếu email đã tồn tại
     const userExists = await User.findOne({ email });
@@ -18,11 +19,13 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Email already exists" });
 
     // Tạo user mới
-    const newUser = new User({ username, email, password, role });
+    const newUser = new User({ username, email, password, role, boards });
     await newUser.save();
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
+    console.log(error);
+
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -58,20 +61,6 @@ router.post("/login", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
-//  Middleware bảo vệ API
-const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "Access denied" });
-
-  try {
-    const decoded = jwt.verify(token, SECRET_KEY);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    res.status(403).json({ message: "Invalid token" });
-  }
-};
 
 //  API test: Truy cập chỉ khi có JWT
 router.get("/protected", authMiddleware, (req, res) => {
