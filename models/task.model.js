@@ -5,11 +5,13 @@ const COLLECTION_NAME = "Tasks";
 
 const taskSchema = new mongoose.Schema(
   {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
+    assigneeId: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: false,
+      },
+    ],
     title: {
       type: String,
       required: true,
@@ -20,6 +22,7 @@ const taskSchema = new mongoose.Schema(
       required: true,
       trim: true, // Added trimming
     },
+    cover: { type: String, default: null },
     status: {
       type: String,
       enum: ["todo", "in-progress", "done"],
@@ -32,6 +35,11 @@ const taskSchema = new mongoose.Schema(
     },
     dueDate: {
       type: Date,
+    },
+    comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "Comment" }],
+    attachments: {
+      type: [String],
+      required: false,
     },
   },
   {

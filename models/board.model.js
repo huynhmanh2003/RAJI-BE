@@ -5,15 +5,13 @@ const BoardSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: { type: String, default: null },
     cover: { type: String, default: null },
-    memberIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "Comment" }],
-    attachments: [
+    columnId: { type: String, required: true },
+    columnOrderIds: [
       {
-        filename: { type: String, required: true },
-        url: { type: String, required: true },
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Column",
       },
     ],
-    columnId: { type: String, required: true },
   },
   { timestamps: true }
 );

@@ -5,9 +5,10 @@ const bodyParser = require("body-parser");
 const connectDB = require("./config/db");
 const authRoutes = require("./api/authRoutes");
 const boardRoutes = require("./api/board.route");
-const groupRoutes = require("./api/group.route");
 const taskRoutes = require("./api/task.route");
 const commentRoutes = require("./api/comment.route");
+const projectRouter = require("./api/project.route");
+const columnRouter = require("./api/column.route");
 
 const app = express();
 connectDB();
@@ -17,9 +18,10 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/boards", boardRoutes);
-app.use("/api/groups", groupRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/comments", commentRoutes);
+app.use("/api/projects", projectRouter);
+app.use("/api/column", columnRouter);
 
 // Lắng nghe server
 const PORT = process.env.PORT || 5000;
