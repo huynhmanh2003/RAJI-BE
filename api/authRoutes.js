@@ -36,7 +36,15 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
     // Kiểm tra user
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).populate({
+      path: "project",
+      select: "_id projectName",
+      populate: {
+        path: "projectBoards",
+        select: "_id title",
+      },
+    });
+
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     // Kiểm tra mật khẩu
@@ -56,7 +64,9 @@ router.post("/login", async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    res.status(200).json({ token, username: user.username });
+    res
+      .status(200)
+      .json({ token, username: user.username, project: user.project });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }

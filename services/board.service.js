@@ -55,9 +55,8 @@ class BoardService {
     return await Column.findById(savedColumn._id).populate("cards");
   }
   static async createBoard(boardData) {
-    const { title, description, cover, memberIds, columnId } = boardData;
+    const { title, description, cover, memberIds } = boardData;
     if (!title) throw new BadRequestError("Board title is required");
-    if (!columnId) throw new BadRequestError("Column ID is required");
 
     if (memberIds) {
       memberIds.forEach((id) => {
@@ -71,7 +70,6 @@ class BoardService {
       description,
       cover,
       memberIds,
-      columnId,
     });
   }
 
