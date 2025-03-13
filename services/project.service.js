@@ -1,4 +1,5 @@
 const Project = require("../models/project.model");
+const User = require("../models/user.model");
 const BoardService = require("./board.service");
 const mongoose = require("mongoose");
 
@@ -19,6 +20,11 @@ class ProjectService {
     });
 
     const savedProject = await newProject.save();
+    await User.findByIdAndUpdate(
+      userId,
+      { $push: { project: savedProject._id } },
+      { new: true }
+    );
 
     return await Project.findById(savedProject._id)
       .populate("projectManagerId", "username email")
