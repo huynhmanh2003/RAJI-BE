@@ -17,7 +17,7 @@ class ProjectController {
   };
 
   addBoardToProject = async (req, res, next) => {
-    const projectId = req.params.id;
+    const projectId = req.params?.id;  
     const userId = req.user?.userId;
     if (!userId) throw new Error("User not authenticated");
 

@@ -12,7 +12,20 @@ class BoardController {
     });
     result.send(res);
   };
+  addColumnToBoard = async (req, res, next) => {
+    const boardId = req.params?.id;
+    const columnData = req.body.columnData;
+    console.log(boardId);
 
+    const result = new OK({
+      message: "Column added to board successfully",
+      metadata: await boardService.createColumnAndAddToBoard({
+        boardId,
+        columnData,
+      }),
+    });
+    result.send(res);
+  };
   getAllBoards = async (req, res, next) => {
     const result = new OK({
       message: "Boards retrieved successfully",

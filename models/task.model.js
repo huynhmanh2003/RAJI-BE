@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const DOCUMENT_NAME = "Task";
-const COLLECTION_NAME = "Tasks";
+const COLLECTION_NAME = "tasks";
 
 const taskSchema = new mongoose.Schema(
   {
