@@ -63,7 +63,7 @@ class BoardService {
   }
 
   static async getAllBoards() {
-    return await Board.find().populate("memberIds comments attachments").lean();
+    return await Board.find().lean(); // Bỏ populate
   }
 
   static async findBoard(id) {
@@ -71,8 +71,10 @@ class BoardService {
       throw new BadRequestError("Valid Board ID is required");
 
     const board = await Board.findById(id)
-      .populate("memberIds comments attachments")
+      .populate("memberIds") // Chỉ populate nếu field có trong schema
+      .populate("columnOrderIds")
       .lean();
+
     if (!board) throw new NotFoundError("Board not found");
     return board;
   }

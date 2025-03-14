@@ -12,6 +12,24 @@ const BoardSchema = new mongoose.Schema(
         ref: "Column",
       },
     ],
+    memberIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User", // Đảm bảo đây là đúng Model
+      },
+    ],
+    comments: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Comment", // Đảm bảo đây là đúng Model
+      },
+    ],
+    attachments: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Attachment", // Đảm bảo đây là đúng Model
+      },
+    ],
   },
   { timestamps: true }
 );
