@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
 const transporter = require("../config/email"); // Import module gửi email
 const authMiddleware = require("../middleware/auth.middleware");
+const { default: mongoose } = require("mongoose");
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET;
@@ -148,4 +149,24 @@ router.post("/change-password", authMiddleware, async (req, res) => {
   }
 });
 
+router.get("/profile", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) throw new Error("User not authenticated");
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new Error("Invalid user ID");
+    }
+    const user = await User.findById(userId).populate("project");
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+    res
+      .status(200)
+      .json({ message: "Get User was successfully", metadata: user });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
 module.exports = router;
