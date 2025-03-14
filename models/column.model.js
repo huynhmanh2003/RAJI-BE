@@ -4,7 +4,9 @@ const ColumnSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     cardOrderIds: { type: [String], required: false },
-    cards: [{ type: mongoose.Schema.Types.ObjectId, ref: "Card" }],
+    tasks: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Task", required: false },
+    ],
   },
   { timestamps: true }
 );

@@ -1,5 +1,6 @@
 const Column = require("../models/column.model");
 const mongoose = require("mongoose");
+const Task = require("../models/task.model");
 
 class ColumnService {
   // Tạo column mới
@@ -13,14 +14,29 @@ class ColumnService {
     const newColumn = new Column({
       title,
       cardOrderIds: cardOrderIds || [],
-      cards: cards || [],
+      tasks: tasks || [],
     });
 
     const savedColumn = await newColumn.save();
 
-    return await Column.findById(savedColumn._id).populate("cards");
+    return await Column.findById(savedColumn._id).populate("tasks");
   }
-
+  async addTaskToColumn({ columnId, taskData }) {
+    if (!mongoose.Types.ObjectId.isValid(columnId)) {
+      throw new Error("Invalid column ID");
+    }
+    const newTask = new Task(taskData);
+    const saveTask = await newTask.save();
+    const column = await Column.findByIdAndUpdate(
+      columnId,
+      { $push: { tasks: saveTask._id } },
+      { new: true }
+    ).populate("tasks");
+    if (!column) {
+      await Task.findByIdAndDelete(saveTask._id);
+      throw new Error("Column not found");
+    }
+  }
   // Lấy tất cả column
   async getAllColumns() {
     return await Column.find().populate("cards");

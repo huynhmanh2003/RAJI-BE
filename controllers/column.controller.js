@@ -9,12 +9,20 @@ class ColumnController {
     const result = new CREATED({
       message: "Column created successfully",
       metadata: await columnService.createColumn({
-        columnData: req.body,
+        columnData: req.body?.columnData,
       }),
     });
     result.send(res);
   };
-
+  addTaskToColumn = async (req, res, next) => {
+    const columnId = req.params?.id;
+    const taskData = req.body?.taskData;
+    const result = new OK({
+      message: "Task added to column successfully",
+      metadata: await columnService.addTaskToColumn({ columnId, taskData }),
+    });
+    result.send(res);
+  };
   getAllColumns = async (req, res, next) => {
     const result = new OK({
       message: "Columns retrieved successfully",

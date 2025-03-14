@@ -9,5 +9,9 @@ router.post("/", authMiddleware, asyncHandler(boardController.createBoard)); // 
 router.get("/:id", asyncHandler(boardController.getBoard));
 router.put("/:id", asyncHandler(boardController.updateBoard));
 router.delete("/:id", asyncHandler(boardController.deleteBoard));
-
+router.put(
+    "/:id/create-column",
+    authMiddleware,
+    boardController.addColumnToBoard
+  );
 module.exports = router;

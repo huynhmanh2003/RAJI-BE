@@ -17,19 +17,37 @@ class ProjectController {
   };
 
   addBoardToProject = async (req, res, next) => {
-    const projectId = req.params.id;
-    const userId = req.user?.userId;
-    if (!userId) throw new Error("User not authenticated");
+    try {
+      // Lấy projectId từ URL
+      const projectId = req.params?.id;
+      // Lấy userId từ req.user (đã được xác thực trước đó)
+      const userId = req.user?.userId;
 
-    const result = new OK({
-      message: "Board added to project successfully",
-      metadata: await projectService.addBoardToProject({
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Kiểm tra dữ liệu board
+      if (!req.body.boardData) {
+        return res.status(400).json({ error: "Board data is required" });
+      }
+
+      // Thêm board vào project
+      const updatedProject = await projectService.addBoardToProject({
         projectId,
         userId,
         boardData: req.body.boardData,
-      }),
-    });
-    result.send(res);
+      });
+
+      // Trả về kết quả
+      res.status(200).json({
+        message: "Board added to project successfully",
+        metadata: updatedProject,
+      });
+    } catch (error) {
+      console.error("Error adding board to project:", error.message);
+      res.status(500).json({ error: error.message });
+    }
   };
 
   getAllProjects = async (req, res, next) => {

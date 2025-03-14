@@ -7,13 +7,14 @@ const {
 const Column = require("../models/column.model");
 
 class BoardService {
-  static async createColumnAndAddToBoard({ boardId, columnData, userId }) {
+  static async createColumnAndAddToBoard({ boardId, columnData }) {
     // Kiểm tra boardId hợp lệ
+
     if (!mongoose.Types.ObjectId.isValid(boardId)) {
       throw new Error("Invalid board ID");
     }
 
-    const { title, cardOrderIds, cards } = columnData;
+    const { title, cardOrderIds, tasks } = columnData;
     if (!title) {
       throw new Error("Title is required");
     }
@@ -22,7 +23,7 @@ class BoardService {
     const newColumn = new Column({
       title,
       cardOrderIds: cardOrderIds || [],
-      cards: cards || [],
+      tasks: tasks || [],
     });
 
     const savedColumn = await newColumn.save();
@@ -30,9 +31,9 @@ class BoardService {
     // Tìm và cập nhật board
     const updatedBoard = await Board.findByIdAndUpdate(
       boardId,
-      { $push: { columns: savedColumn._id } },
+      { $push: { columnId: savedColumn._id } },
       { new: true }
-    ).populate("columns");
+    ).populate("columnId");
 
     if (!updatedBoard) {
       // Nếu board không tồn tại, xóa column vừa tạo để tránh dữ liệu rác
@@ -40,19 +41,7 @@ class BoardService {
       throw new Error("Board not found");
     }
 
-    // Kiểm tra quyền (giả sử chỉ project manager của project chứa board được phép thêm column)
-    const project = await Project.findById(updatedBoard.projectId);
-    if (!project) {
-      throw new Error("Project not found");
-    }
-    const isProjectManager = project.projectManagerId.toString() === userId;
-    if (!isProjectManager) {
-      // Xóa column vừa tạo nếu không có quyền
-      await Column.findByIdAndDelete(savedColumn._id);
-      throw new Error("You are not authorized to add column to this board");
-    }
-
-    return await Column.findById(savedColumn._id).populate("cards");
+    return await Column.findById(savedColumn._id);
   }
   static async createBoard(boardData) {
     const { title, description, cover, memberIds } = boardData;
@@ -74,7 +63,7 @@ class BoardService {
   }
 
   static async getAllBoards() {
-    return await Board.find().populate("memberIds comments attachments").lean();
+    return await Board.find().lean(); // Bỏ populate
   }
 
   static async findBoard(id) {
@@ -82,8 +71,10 @@ class BoardService {
       throw new BadRequestError("Valid Board ID is required");
 
     const board = await Board.findById(id)
-      .populate("memberIds comments attachments")
+      .populate("memberIds") // Chỉ populate nếu field có trong schema
+      .populate("columnOrderIds")
       .lean();
+
     if (!board) throw new NotFoundError("Board not found");
     return board;
   }
