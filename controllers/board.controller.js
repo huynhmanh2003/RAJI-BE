@@ -12,6 +12,7 @@ class BoardController {
     });
     result.send(res);
   };
+
   addColumnToBoard = async (req, res, next) => {
     const boardId = req.params?.id;
     const columnData = req.body.columnData;
@@ -26,6 +27,7 @@ class BoardController {
     });
     result.send(res);
   };
+
   getAllBoards = async (req, res, next) => {
     const result = new OK({
       message: "Boards retrieved successfully",

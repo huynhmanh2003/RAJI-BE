@@ -1,12 +1,35 @@
 const Project = require("../models/project.model");
 const User = require("../models/user.model");
+const Invitation = require("../models/invitation.model");
 const BoardService = require("./board.service");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const { google } = require("googleapis");
+const transporter = require("../config/email");
+
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  "http://localhost:5000"
+);
+
+oauth2Client.setCredentials({
+  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+});
 
 class ProjectService {
-  // Tạo project mới
+  constructor(io, userSocketMap) {
+    this.io = io;
+    this.userSocketMap = userSocketMap;
+  }
+
+  async getAccessToken() {
+    const { token } = await oauth2Client.getAccessToken();
+    return token;
+  }
+
   async createProject({ userId, projectData }) {
-    const { projectName, projectMembers, projectBoards } = projectData;
+    const { projectName, projectBoards } = projectData;
 
     if (!projectName) {
       throw new Error("projectName is required");
@@ -14,7 +37,7 @@ class ProjectService {
 
     const newProject = new Project({
       projectName,
-      projectMembers: projectMembers || [],
+      projectMembers: [],
       projectManagerId: userId,
       projectBoards: projectBoards || [],
     });
@@ -26,13 +49,24 @@ class ProjectService {
       { new: true }
     );
 
-    return await Project.findById(savedProject._id)
+    const project = await Project.findById(savedProject._id)
       .populate("projectManagerId", "username email")
       .populate("projectMembers", "username email")
       .populate("projectBoards");
+
+    const projectManagerId = project.projectManagerId._id.toString();
+    const socketId = this.userSocketMap.get(projectManagerId);
+    if (socketId) {
+      this.io.to(socketId).emit("project:updated", {
+        message: `Project ${project.projectName} has been created`,
+        projectId: project._id.toString(),
+        projectName: project.projectName,
+      });
+    }
+
+    return project;
   }
 
-  // Thêm board vào project
   async addBoardToProject({ projectId, userId, boardData }) {
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
       throw new Error("Invalid project ID");
@@ -42,70 +76,203 @@ class ProjectService {
       throw new Error("Board data is required");
     }
 
-    // Tạo board mới
-    const board = await BoardService.createBoard(boardData);
+    const boardDataWithProjectId = { ...boardData, projectId };
+    const board = await BoardService.createBoard(boardDataWithProjectId);
     if (!board || !board._id) {
       throw new Error("Failed to create board");
     }
 
-    // Tìm và cập nhật project
     const updatedProject = await Project.findByIdAndUpdate(
       projectId,
       { $push: { projectBoards: board._id } },
       { new: true }
-    ).populate("projectBoards");
+    ).populate("projectBoards projectMembers projectManagerId");
 
     if (!updatedProject) {
       throw new Error("Project not found");
     }
 
-    // Kiểm tra quyền của user
-    const isProjectManager =
-      updatedProject.projectManagerId.toString() === userId;
+    const isProjectManager = updatedProject.projectManagerId.toString() === userId;
     if (!isProjectManager) {
       throw new Error("You are not authorized to add board to project");
     }
 
+    const memberIds = updatedProject.projectMembers.map(m => m._id.toString()) || [];
+    const userIds = [...memberIds, updatedProject.projectManagerId._id.toString()];
+    userIds.forEach((uid) => {
+      const socketId = this.userSocketMap.get(uid);
+      if (socketId) {
+        this.io.to(socketId).emit("project:updated", {
+          message: `Project ${updatedProject.projectName} has been updated: New board ${boardData.title || 'untitled'} added`,
+          projectId: updatedProject._id.toString(),
+          projectName: updatedProject.projectName,
+        });
+      }
+    });
+
     return updatedProject;
   }
 
-  // Lấy danh sách tất cả project
-  async getAllProjects() {
-    return await Project.find()
-      .populate("projectManagerId", "username email")
-      .populate("projectMembers", "username email")
-      .populate("projectBoards");
-  }
-
-  // Lấy thông tin một project theo ID
-  async getProjectById({ projectId, userId }) {
-    const project = await Project.findById(projectId)
-      .populate("projectManagerId", "username email")
-      .populate("projectMembers", "username email")
-      .populate("projectBoards");
-
-    if (!project) {
-      throw new Error("Project not found");
-    }
-
-    const isProjectManager = project.projectManagerId.toString() === userId;
-    const isProjectMember = project.projectMembers.some(
-      (memberId) => memberId.toString() === userId
-    );
-
-    if (!isProjectManager && !isProjectMember) {
-      throw new Error("You are not authorized to access this project");
-    }
-
-    return project;
-  }
-
-  // Cập nhật project
-  async updateProject(projectId, updates) {
+  async inviteMember({ projectId, userId, email }) {
     const project = await Project.findById(projectId);
-    if (!project) {
+    if (!project) throw new Error("Project not found");
+    if (project.projectManagerId.toString() !== userId) throw new Error("Only project manager can invite members");
+
+    const token = jwt.sign({ projectId, email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const confirmationLink = `http://localhost:5000/api/projects/${projectId}/confirm-invite?token=${token}`;
+
+    const invitation = new Invitation({
+      projectId,
+      userId,
+      email,
+      token,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // Hết hạn sau 1 giờ
+    });
+    await invitation.save();
+
+    const accessToken = await this.getAccessToken();
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Invitation to Join Project",
+      text: `Click this link to join the project: ${confirmationLink}`,
+      auth: {
+        type: "OAuth2",
+        user: process.env.EMAIL_USER,
+        accessToken,
+      },
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+      return { email, projectId, invitationId: invitation._id };
+    } catch (error) {
+      console.error("Email sending error:", error);
+      throw new Error("Failed to send invitation email: " + error.message);
+    }
+  }
+
+  async confirmInvite(token) {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { projectId, email } = decoded;
+
+    const invitation = await Invitation.findOne({ token, email, projectId });
+    if (!invitation) throw new Error("Invalid or expired invitation");
+    if (invitation.status !== "pending") throw new Error("Invitation already processed");
+    if (invitation.expiresAt < new Date()) throw new Error("Invitation has expired");
+
+    const project = await Project.findById(projectId);
+    if (!project) throw new Error("Project not found");
+
+    const user = await User.findOne({ email });
+    if (!user) throw new Error("User not found");
+
+    const userId = user._id.toString();
+    const updatedProject = await this.addMembersToProject(projectId, [userId]);
+
+    invitation.status = "accepted";
+    await invitation.save();
+
+    return { projectId, userId };
+  }
+
+  async addMembersToProject(projectId, memberIds) {
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      throw new Error("Invalid project ID");
+    }
+
+    if (!memberIds || !Array.isArray(memberIds)) {
+      throw new Error("memberIds must be an array");
+    }
+
+    memberIds.forEach((id) => {
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new Error(`Invalid member ID: ${id}`);
+      }
+    });
+
+    const updatedProject = await Project.findByIdAndUpdate(
+      projectId,
+      { $addToSet: { projectMembers: { $each: memberIds } } },
+      { new: true }
+    ).populate("projectManagerId projectMembers projectBoards");
+
+    if (!updatedProject) {
       throw new Error("Project not found");
     }
+
+    const memberIdsList = updatedProject.projectMembers.map(m => m._id.toString()) || [];
+    const userIds = [...memberIdsList, updatedProject.projectManagerId._id.toString()];
+    memberIds.forEach((uid) => {
+      const socketId = this.userSocketMap.get(uid);
+      if (socketId) {
+        this.io.to(socketId).emit("member:added", {
+          message: `You have been added to Project ${updatedProject.projectName}`,
+          projectId: updatedProject._id.toString(),
+          projectName: updatedProject.projectName,
+        });
+      }
+    });
+
+    userIds.forEach((uid) => {
+      const socketId = this.userSocketMap.get(uid);
+      if (socketId) {
+        this.io.to(socketId).emit("project:updated", {
+          message: `Project ${updatedProject.projectName} has been updated: New members added`,
+          projectId: updatedProject._id.toString(),
+          projectName: updatedProject.projectName,
+        });
+      }
+    });
+
+    return updatedProject;
+  }
+
+  async removeMembersFromProject(projectId, memberIds) {
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      throw new Error("Invalid project ID");
+    }
+
+    if (!memberIds || !Array.isArray(memberIds)) {
+      throw new Error("memberIds must be an array");
+    }
+
+    memberIds.forEach((id) => {
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new Error(`Invalid member ID: ${id}`);
+      }
+    });
+
+    const updatedProject = await Project.findByIdAndUpdate(
+      projectId,
+      { $pull: { projectMembers: { $in: memberIds } } },
+      { new: true }
+    ).populate("projectManagerId projectMembers projectBoards");
+
+    if (!updatedProject) {
+      throw new Error("Project not found");
+    }
+
+    const memberIdsList = updatedProject.projectMembers.map(m => m._id.toString()) || [];
+    const userIds = [...memberIdsList, updatedProject.projectManagerId._id.toString()];
+    userIds.forEach((uid) => {
+      const socketId = this.userSocketMap.get(uid);
+      if (socketId) {
+        this.io.to(socketId).emit("project:updated", {
+          message: `Project ${updatedProject.projectName} has been updated: Members removed`,
+          projectId: updatedProject._id.toString(),
+          projectName: updatedProject.projectName,
+        });
+      }
+    });
+
+    return updatedProject;
+  }
+
+  async updateProject(projectId, updates, userId) {
+    const project = await Project.findById(projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.projectManagerId.toString() !== userId) throw new Error("Only project manager can update project");
 
     const updatedProject = await Project.findByIdAndUpdate(
       projectId,
@@ -116,19 +283,64 @@ class ProjectService {
       .populate("projectMembers", "username email")
       .populate("projectBoards");
 
+    const memberIds = updatedProject.projectMembers.map(m => m._id.toString()) || [];
+    const userIds = [...memberIds, updatedProject.projectManagerId._id.toString()];
+    userIds.forEach((uid) => {
+      const socketId = this.userSocketMap.get(uid);
+      if (socketId) {
+        this.io.to(socketId).emit("project:updated", {
+          message: `Project ${updatedProject.projectName} has been updated`,
+          projectId: updatedProject._id.toString(),
+          projectName: updatedProject.projectName,
+        });
+      }
+    });
+
     return updatedProject;
   }
 
-  // Xóa project
-  async deleteProject(projectId) {
+  async deleteProject(projectId, userId) {
     const project = await Project.findById(projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.projectManagerId.toString() !== userId) throw new Error("Only project manager can delete project");
+
+    await Project.findByIdAndDelete(projectId);
+
+    const memberIds = project.projectMembers.map(m => m._id.toString()) || [];
+    const userIds = [...memberIds, project.projectManagerId._id.toString()];
+    userIds.forEach((uid) => {
+      const socketId = this.userSocketMap.get(uid);
+      if (socketId) {
+        this.io.to(socketId).emit("project:updated", {
+          message: `Project ${project.projectName} has been deleted`,
+          projectId: project._id.toString(),
+          projectName: project.projectName,
+        });
+      }
+    });
+
+    return { deletedProjectId: projectId };
+  }
+
+  async getAllProjects() {
+    return await Project.find()
+      .populate("projectManagerId", "username email")
+      .populate("projectMembers", "username email")
+      .populate("projectBoards");
+  }
+
+  async getProjectById({ projectId, userId }) {
+    const project = await Project.findById(projectId)
+      .populate("projectManagerId", "username email")
+      .populate("projectMembers", "username email")
+      .populate("projectBoards");
+
     if (!project) {
       throw new Error("Project not found");
     }
 
-    await Project.findByIdAndDelete(projectId);
-    return { deletedProjectId: projectId };
+    return project;
   }
 }
 
-module.exports = new ProjectService();
+module.exports = (io, userSocketMap) => new ProjectService(io, userSocketMap);

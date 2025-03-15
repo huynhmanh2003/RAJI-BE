@@ -5,13 +5,23 @@ const BoardSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: { type: String, default: null },
     cover: { type: String, default: null },
-    columnId: { type: String, required: false },
     columnOrderIds: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Column",
       },
     ],
+    memberIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    projectId: { // Thêm trường này
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      required: true
+    },
   },
   { timestamps: true }
 );
