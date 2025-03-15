@@ -4,28 +4,12 @@ const Invitation = require("../models/invitation.model");
 const BoardService = require("./board.service");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
-const { google } = require("googleapis");
-const transporter = require("../config/email");
-
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  "http://localhost:5000"
-);
-
-oauth2Client.setCredentials({
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-});
+const transporter = require("../config/email"); // Import transporter
 
 class ProjectService {
   constructor(io, userSocketMap) {
     this.io = io;
     this.userSocketMap = userSocketMap;
-  }
-
-  async getAccessToken() {
-    const { token } = await oauth2Client.getAccessToken();
-    return token;
   }
 
   async createProject({ userId, projectData }) {
@@ -130,21 +114,17 @@ class ProjectService {
     });
     await invitation.save();
 
-    const accessToken = await this.getAccessToken();
+    // Sử dụng transporter.sendMail thay vì sendEmail
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Invitation to Join Project",
       text: `Click this link to join the project: ${confirmationLink}`,
-      auth: {
-        type: "OAuth2",
-        user: process.env.EMAIL_USER,
-        accessToken,
-      },
     };
 
     try {
-      await transporter.sendMail(mailOptions);
+      await transporter.sendMail(mailOptions); // Gọi trực tiếp sendMail
+      console.log("Email sent successfully to:", email);
       return { email, projectId, invitationId: invitation._id };
     } catch (error) {
       console.error("Email sending error:", error);
