@@ -1,17 +1,29 @@
 const mongoose = require("mongoose");
 
-const projectSchema = new mongoose.Schema(
-  {
-    projectName: { type: String, required: true },
-    projectMembers: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "User" }
-    ],
-    projectManagerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    projectBoards: [ // Thêm trường này
-      { type: mongoose.Schema.Types.ObjectId, ref: "Board" }
-    ],
+const ProjectSchema = new mongoose.Schema({
+  projectName: {
+    type: String,
+    required: true, // Tên dự án là bắt buộc
   },
-  { timestamps: true }
-);
+  projectMembers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+    },
+  ],
+  projectManagerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  projectBoards: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Board",
+      required: false,
+    },
+  ],
+});
 
-module.exports = mongoose.model("Project", projectSchema);
+module.exports = mongoose.model("Project", ProjectSchema);

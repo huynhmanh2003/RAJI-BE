@@ -11,72 +11,70 @@ const projectRouter = require("./api/project.route");
 const columnRouter = require("./api/column.route");
 const http = require("http");
 const socketIo = require("socket.io");
-const createProjectService = require("./services/project.service");
-const createProjectController = require("./controllers/project.controller");
+const path = require("path");
 
 const app = express();
-connectDB();
-
-// Middleware
-app.use(cors({
-  origin: "http://localhost:3000",
-  methods: ["GET", "POST", "PUT", "DELETE"], // Thêm PUT, DELETE
-}));
-app.use(bodyParser.json());
-
-// Tạo server HTTP và tích hợp Socket.IO
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: "*",
+    methods: ["GET", "POST"],
   },
 });
 
-// Lưu mapping userId -> socketId
-const userSocketMap = new Map();
+connectDB();
 
-// Khởi tạo service và controller với io, userSocketMap
-const projectService = createProjectService(io, userSocketMap);
-const projectController = createProjectController(io, userSocketMap);
+global._io = io;
+global._userSocketMap = new Map();
 
-// Gắn routes
+app.use(cors());
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, "public")));
+
 app.use("/api/auth", authRoutes);
 app.use("/api/boards", boardRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/comments", commentRoutes);
-app.use("/api/projects", projectRouter(projectController)); // Truyền controller vào router
+app.use("/api/projects", projectRouter);
 app.use("/api/columns", columnRouter);
 
-// Middleware xử lý lỗi toàn cục
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: "Something went wrong!", error: err.message });
+  res.status(err.status || 400).json({
+    success: false,
+    message: err.message || "Something went wrong",
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+  });
 });
 
-// Xử lý kết nối Socket.IO
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
-
-  socket.on("registerUser", (userId) => {
+  console.log("New client connected:", socket.id);
+  const userId = socket.handshake.query.userId || socket.handshake.auth.userId; // Lấy từ query hoặc auth
+  if (userId) {
+    global._userSocketMap.set(userId, socket.id);
     console.log(`User ${userId} registered with socket ${socket.id}`);
-    userSocketMap.set(userId.toString(), socket.id);
-    console.log("Current userSocketMap:", [...userSocketMap.entries()]);
+    console.log("Current userSocketMap:", [...global._userSocketMap]);
+  }
+
+  // Xử lý event register từ FE
+  socket.on("register", (userId) => {
+    if (userId) {
+      global._userSocketMap.set(userId, socket.id);
+      console.log(`User ${userId} registered with socket ${socket.id} via register event`);
+      console.log("Current userSocketMap:", [...global._userSocketMap]);
+    }
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-    for (const [userId, socketId] of userSocketMap.entries()) {
+    for (let [uid, socketId] of global._userSocketMap.entries()) {
       if (socketId === socket.id) {
-        userSocketMap.delete(userId);
-        console.log(`User ${userId} removed from mapping`);
+        global._userSocketMap.delete(uid);
+        console.log(`User ${uid} disconnected`);
         break;
       }
     }
-    console.log("Current userSocketMap after disconnect:", [...userSocketMap.entries()]);
   });
 });
 
-// Lắng nghe server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
