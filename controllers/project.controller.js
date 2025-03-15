@@ -59,17 +59,22 @@ class ProjectController {
   };
 
   getProjectById = async (req, res, next) => {
-    const userId = req.user?.userId;
-    if (!userId) throw new Error("User not authenticated");
+    try {
+      const userId = req.user?.userId;
 
-    const result = new OK({
-      message: "Project retrieved successfully",
-      metadata: await projectService.getProjectById({
-        projectId: req.params.id,
-        userId,
-      }),
-    });
-    result.send(res);
+      if (!userId) throw new Error("User not authenticated");
+
+      const result = new OK({
+        message: "Project retrieved successfully",
+        metadata: await projectService.getProjectById({
+          projectId: req.params.id,
+          userId,
+        }),
+      });
+      result.send(res);
+    } catch (error) {
+      res.status(405).send(error);  
+    }
   };
 
   updateProject = async (req, res, next) => {
@@ -86,6 +91,20 @@ class ProjectController {
       metadata: await projectService.deleteProject(req.params.id),
     });
     result.send(res);
+  };
+  getProjectByUserId = async (req, res, next) => {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) throw new Error("User not authenticated");
+      const result = new OK({
+        message: "Projects retrieved successfully",
+        metadata: await projectService.getProjectByUserId(userId),
+      });
+      result.send(res);
+    } catch (error) {
+      res.status(405).send(error);
+    }
   };
 }
 

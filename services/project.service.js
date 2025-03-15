@@ -79,11 +79,16 @@ class ProjectService {
 
   // Lấy thông tin một project theo ID
   async getProjectById({ projectId, userId }) {
-    const project = await Project.findById(projectId)
-      .populate("projectManagerId", "username email")
-      .populate("projectMembers", "username email")
-      .populate("projectBoards");
-
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      throw new Error("Invalid project ID");
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new Error("Invalid userId ID");
+    }
+    const project = await Project.findById(projectId).populate({
+      path: "projectBoards",
+      select: "_id title",
+    });
     if (!project) {
       throw new Error("Project not found");
     }
@@ -128,6 +133,13 @@ class ProjectService {
 
     await Project.findByIdAndDelete(projectId);
     return { deletedProjectId: projectId };
+  }
+  async getProjectByUserId(userId) {
+    const projects = await Project.find({ projectManagerId: userId });
+    if (!projects) {
+      throw new Error("No projects found for this user");
+    }
+    return projects;
   }
 }
 
