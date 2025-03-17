@@ -15,6 +15,6 @@ router.put(
   authMiddleware,
   projectController.addBoardToProject
 );
-router.post("/invite", authMiddleware, ProjectController.inviteMemberToProject);
-router.get("/invite/:inviteId/accept", ProjectController.acceptInvite);
+router.post("/invite", authMiddleware, projectController.inviteMemberToProject);
+router.get("/invite/:inviteId/accept", projectController.acceptInvite);
 module.exports = router;

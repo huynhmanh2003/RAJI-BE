@@ -1,7 +1,7 @@
 const transporter = require("../config/email"); // Import transporter từ config
 
 const sendInviteEmail = async (toEmail, inviteId) => {
-  const acceptLink = `${process.env.BASE_URL}/api/project/invite/${inviteId}/accept`;
+  const acceptLink = `${process.env.BASE_URL}/api/projects/invite/${inviteId}/accept`;
 
   const mailOptions = {
     from: process.env.EMAIL_USER,
