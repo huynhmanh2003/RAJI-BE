@@ -92,14 +92,39 @@ class BoardService {
     return board;
   }
 
-  static async deleteBoard(id) {
-    if (!id || !mongoose.Types.ObjectId.isValid(id))
-      throw new BadRequestError("Valid Board ID is required");
+  static async deleteBoard({ boardId, userId }) {
+    const board = await Board.findById(boardId);
+    if (!board) {
+      throw new Error("Board not found");
+    }
 
-    const board = await Board.findByIdAndDelete(id);
-    if (!board) throw new NotFoundError("Board not found");
-    return board;
+    // Kiểm tra quyền PM từ project mà board thuộc về
+    const project = await Project.findById(board.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    if (project.projectManagerId.toString() !== userId) {
+      throw new Error("You are not authorized to delete this board");
+    }
+
+    // Xóa tất cả columns trong board
+    for (const columnId of board.columnOrderIds) {
+      await ColumnService.deleteColumn({ columnId, userId });
+    }
+
+    // Xóa board khỏi danh sách projectBoards trong project
+    await Project.findByIdAndUpdate(project._id, {
+      $pull: { projectBoards: boardId },
+    });
+
+    // Xóa board
+    await Board.findByIdAndDelete(boardId);
+
+    return { deletedBoardId: boardId };
   }
+
+
 }
 
 module.exports = BoardService;

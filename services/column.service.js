@@ -76,18 +76,47 @@ class ColumnService {
     return updatedColumn;
   }
 
-  // Xóa column
-  async deleteColumn(columnId) {
-    if (!mongoose.Types.ObjectId.isValid(columnId)) {
-      throw new Error("Invalid column ID");
-    }
-
+  // Xóa column (chỉ PM mới có quyền)
+  static async deleteColumn({ columnId, boardId, pmId, userId }) {
     const column = await Column.findById(columnId);
     if (!column) {
       throw new Error("Column not found");
     }
 
+    // Kiểm tra column có thuộc board này không
+    if (column.boardId.toString() !== boardId) {
+      throw new Error("Invalid boardId for this column");
+    }
+
+    // Lấy thông tin board và project để xác minh quyền PM
+    const board = await Board.findById(boardId);
+    if (!board) {
+      throw new Error("Board not found");
+    }
+
+    const project = await Project.findById(board.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    // Kiểm tra quyền: PM của project phải khớp với userId
+    if (pmId !== userId || project.projectManagerId.toString() !== userId) {
+      throw new Error("You are not authorized to delete this column");
+    }
+
+    // Xóa tất cả tasks trong column
+    for (const taskId of column.tasks) {
+      await TaskService.deleteTask({ taskId, userId });
+    }
+
+    // Xóa column khỏi danh sách columns trong board
+    await Board.findByIdAndUpdate(boardId, {
+      $pull: { columnOrderIds: columnId },
+    });
+
+    // Xóa column
     await Column.findByIdAndDelete(columnId);
+
     return { deletedColumnId: columnId };
   }
 }
