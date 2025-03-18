@@ -5,6 +5,7 @@ const {
   UnprocessableEntityError,
   BadRequestError,
 } = require("../core/response/error.response");
+const projectService = require("./project.service");
 
 class TaskService {
   async createTask({ userId, task }) {
@@ -57,6 +58,36 @@ class TaskService {
       throw new BadRequestError("Invalid task ID");
     }
     const task = await Task.findByIdAndDelete(id);
+    if (!task) throw new NotFoundError("Task not found");
+    return task;
+  }
+  async assignTask(userId, taskId) {
+    if (
+      !mongoose.Types.ObjectId.isValid(taskId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      throw new BadRequestError("Invalid task ID, user ID, or project ID");
+    }
+    const task = await Task.findByIdAndUpdate(
+      taskId,
+      { $push: { assigneeId: userId } },
+      { new: true }
+    ).populate("assigneeId");
+    if (!task) throw new NotFoundError("Task not found");
+    return task;
+  }
+  async unassignTask(userId, taskId) {
+    if (
+      !mongoose.Types.ObjectId.isValid(taskId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      throw new BadRequestError("Invalid task ID, user ID, or project ID");
+    }
+    const task = await Task.findByIdAndUpdate(
+      taskId,
+      { $pull: { assigneeId: userId } },
+      { new: true }
+    ).populate("assigneeId");
     if (!task) throw new NotFoundError("Task not found");
     return task;
   }
