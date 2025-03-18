@@ -135,7 +135,11 @@ class ProjectService {
     for (const boardId of project.projectBoards) {
       await BoardService.deleteBoard({ boardId, userId });
     }
-
+    // Xóa project khỏi danh sách của tất cả users đang tham gia
+    await User.updateMany(
+      { projects: projectId },
+      { $pull: { projects: projectId } }
+    );
     // Xóa project
     await Project.findByIdAndDelete(projectId);
     return { deletedProjectId: projectId };
