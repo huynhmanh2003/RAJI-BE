@@ -141,6 +141,15 @@ class ProjectService {
     }
     return projects;
   }
+  async isProjectMember(userId, projectId) {
+    const project = await Project.findById(projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    return project.projectMembers.some(
+      (memberId) => memberId.toString() === userId
+    );
+  }
 }
 
 module.exports = new ProjectService();

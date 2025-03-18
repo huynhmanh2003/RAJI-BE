@@ -2,10 +2,10 @@ const { OK, CREATED } = require("../core/response/success.response");
 const taskService = require("../services/task.service");
 
 class TaskController {
-  createTask = async (req, res, next) => { 
-    const userId = req.user?.userId; 
+  createTask = async (req, res, next) => {
+    const userId = req.user?.userId;
     if (!userId) throw new Error("User not authenticated");
-    const result = new CREATED({ 
+    const result = new CREATED({
       message: "Task created successfully",
       metadata: await taskService.createTask({
         userId,
@@ -46,6 +46,34 @@ class TaskController {
     });
     result.send(res);
   };
-}
+  assignTask = async (req, res) => {
+    try {
+      console.log(req.params.id);
 
+      const userId = req.user?.userId;
+      const result = new OK({
+        message: "Task assigned successfully",
+        metadata: await taskService.assignTask(
+          userId,
+          req?.params?.id,
+        ),
+      });
+      result.send(res);
+    } catch (error) {
+      res.status(400).send(error.message);
+    }
+  };
+  unAssignTask = async (req, res) => {
+    try {
+      const userId = req.user?.userId;
+      const result = new OK({
+        message: "Task unassigned successfully",
+        metadata: await taskService.unassignTask(userId, req.params?.id),
+      });
+      result.send(res);
+    } catch (error) {
+      res.status(400).send(error.message);
+    }
+  };
+}
 module.exports = new TaskController();
