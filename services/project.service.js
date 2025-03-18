@@ -124,16 +124,35 @@ class ProjectService {
     return updatedProject;
   }
 
-  // Xóa project
-  async deleteProject(projectId) {
+  // Xóa project (chỉ PM mới được xóa)
+  static async deleteProject({ projectId, userId }) {
     const project = await Project.findById(projectId);
     if (!project) {
       throw new Error("Project not found");
     }
 
+    // Kiểm tra quyền PM
+    if (project.projectManagerId.toString() !== userId) {
+      throw new Error("You are not authorized to delete this project");
+    }
+
+    // Xóa tất cả board trong project (gọi service riêng)
+    for (const boardId of project.projectBoards) {
+      await BoardService.deleteBoard({ boardId, userId });
+    }
+    // Xóa project khỏi danh sách của tất cả users đang tham gia
+    await User.updateMany(
+      { projects: projectId },
+      { $pull: { projects: projectId } }
+    );
+    // Xóa project
     await Project.findByIdAndDelete(projectId);
     return { deletedProjectId: projectId };
   }
+
+
+  // Xóa board khỏi project
+  static async deleteBoardFromProject({ projectId, boardId, userId }) {
   async getProjectByUserId(userId) {
     const projects = await Project.find({ projectManagerId: userId });
     if (!projects) {
@@ -142,13 +161,21 @@ class ProjectService {
     return projects;
   }
   async isProjectMember(userId, projectId) {
-    const project = await Project.findById(projectId);
-    if (!project) {
-      throw new Error("Project not found");
+    // Kiểm tra quyền PM
+    if (project.projectManagerId.toString() !== userId) {
+      throw new Error("You are not authorized to delete this board");
     }
-    return project.projectMembers.some(
-      (memberId) => memberId.toString() === userId
-    );
+
+    // Gọi service để xóa board
+    await BoardService.deleteBoard({ boardId, userId });
+
+    // Cập nhật project để loại bỏ boardId khỏi danh sách
+    await Project.findByIdAndUpdate(projectId, {
+      $pull: { projectBoards: boardId },
+    });
+
+    return { deletedBoardId: boardId };
+
   }
 }
 
