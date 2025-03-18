@@ -53,14 +53,37 @@ class TaskService {
     return task;
   }
 
-  async deleteTask(id) {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestError("Invalid task ID");
-    }
-    const task = await Task.findByIdAndDelete(id);
-    if (!task) throw new NotFoundError("Task not found");
-    return task;
+ // Xóa task (chỉ PM mới có quyền)
+ static async deleteTask({ taskId, userId }) {
+  const task = await Task.findById(taskId);
+  if (!task) {
+    throw new Error("Task not found");
   }
+
+  // Kiểm tra quyền PM từ column mà task thuộc về
+  const column = await Column.findById(task.columnId);
+  if (!column) {
+    throw new Error("Column not found");
+  }
+
+  const board = await Board.findById(column.boardId);
+  if (!board) {
+    throw new Error("Board not found");
+  }
+
+  const project = await Project.findById(board.projectId);
+  if (!project || project.projectManagerId.toString() !== userId) {
+    throw new Error("You are not authorized to delete this task");
+  }
+  // Xóa task khỏi danh sách tasks trong column
+  await Column.findByIdAndUpdate(column._id, { $pull: { tasks: taskId } });
+
+  // Xóa task
+  await Task.findByIdAndDelete(taskId);
+
+  return { deletedTaskId: taskId };
+}
+
   async assignTask(userId, taskId) {
     if (
       !mongoose.Types.ObjectId.isValid(taskId) ||
@@ -91,6 +114,7 @@ class TaskService {
     if (!task) throw new NotFoundError("Task not found");
     return task;
   }
+
 }
 
 module.exports = new TaskService();
