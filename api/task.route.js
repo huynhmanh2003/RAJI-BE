@@ -12,6 +12,8 @@ router.get("/:id", asyncHandler(taskController.getTask));
 router.post("/", asyncHandler(taskController.createTask)); // Changed to createTask
 router.patch("/:id", asyncHandler(taskController.updateTask));
 router.delete("/:id", asyncHandler(taskController.deleteTask));
+router.put("/:id/assign-task", asyncHandler(taskController.assignTask));
+router.put("/:id/unassign-task", asyncHandler(taskController.unAssignTask));
 
 router.use("/:taskId/comments", commentRouter);
 

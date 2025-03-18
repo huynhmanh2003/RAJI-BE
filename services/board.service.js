@@ -31,9 +31,11 @@ class BoardService {
     // Tìm và cập nhật board
     const updatedBoard = await Board.findByIdAndUpdate(
       boardId,
-      { $push: { columnId: savedColumn._id } },
+      {
+        $push: { columnIds: savedColumn._id, columnOrderIds: savedColumn._id },
+      },
       { new: true }
-    ).populate("columnId");
+    ).populate("columnIds");
 
     if (!updatedBoard) {
       // Nếu board không tồn tại, xóa column vừa tạo để tránh dữ liệu rác
@@ -71,8 +73,10 @@ class BoardService {
       throw new BadRequestError("Valid Board ID is required");
 
     const board = await Board.findById(id)
-      .populate("memberIds") // Chỉ populate nếu field có trong schema
-      .populate("columnOrderIds")
+      .populate({
+        path: "columnIds",
+        populate: "tasks",
+      })
       .lean();
 
     if (!board) throw new NotFoundError("Board not found");

@@ -79,11 +79,16 @@ class ProjectService {
 
   // Lấy thông tin một project theo ID
   async getProjectById({ projectId, userId }) {
-    const project = await Project.findById(projectId)
-      .populate("projectManagerId", "username email")
-      .populate("projectMembers", "username email")
-      .populate("projectBoards");
-
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      throw new Error("Invalid project ID");
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new Error("Invalid userId ID");
+    }
+    const project = await Project.findById(projectId).populate({
+      path: "projectBoards",
+      select: "_id title",
+    });
     if (!project) {
       throw new Error("Project not found");
     }
@@ -145,13 +150,17 @@ class ProjectService {
     return { deletedProjectId: projectId };
   }
 
+
   // Xóa board khỏi project
   static async deleteBoardFromProject({ projectId, boardId, userId }) {
-    const project = await Project.findById(projectId);
-    if (!project) {
-      throw new Error("Project not found");
+  async getProjectByUserId(userId) {
+    const projects = await Project.find({ projectManagerId: userId });
+    if (!projects) {
+      throw new Error("No projects found for this user");
     }
-
+    return projects;
+  }
+  async isProjectMember(userId, projectId) {
     // Kiểm tra quyền PM
     if (project.projectManagerId.toString() !== userId) {
       throw new Error("You are not authorized to delete this board");
@@ -166,6 +175,7 @@ class ProjectService {
     });
 
     return { deletedBoardId: boardId };
+
   }
 }
 
