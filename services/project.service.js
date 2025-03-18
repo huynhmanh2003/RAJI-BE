@@ -150,17 +150,13 @@ class ProjectService {
     return { deletedProjectId: projectId };
   }
 
-
   // Xóa board khỏi project
   static async deleteBoardFromProject({ projectId, boardId, userId }) {
-  async getProjectByUserId(userId) {
-    const projects = await Project.find({ projectManagerId: userId });
-    if (!projects) {
-      throw new Error("No projects found for this user");
+    const project = await Project.findById(projectId);
+    if (!project) {
+      throw new Error("Project not found");
     }
-    return projects;
-  }
-  async isProjectMember(userId, projectId) {
+
     // Kiểm tra quyền PM
     if (project.projectManagerId.toString() !== userId) {
       throw new Error("You are not authorized to delete this board");
@@ -175,7 +171,23 @@ class ProjectService {
     });
 
     return { deletedBoardId: boardId };
-
+  }
+  async getProjectByUserId(userId) {
+    const projects = await Project.find({ projectManagerId: userId });
+    if (!projects) {
+      throw new Error("No projects found for this user");
+    }
+    return projects;
+    f;
+  }
+  async isProjectMember(userId, projectId) {
+    const project = await Project.findById(projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    return project.projectMembers.some(
+      (memberId) => memberId.toString() === userId
+    );
   }
 }
 
