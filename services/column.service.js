@@ -71,7 +71,7 @@ class ColumnService {
       columnId,
       { $set: updates },
       { new: true }
-    ).populate("cards");
+    ).populate("tasks");
 
     return updatedColumn;
   }

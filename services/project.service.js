@@ -173,7 +173,9 @@ class ProjectService {
     return { deletedBoardId: boardId };
   }
   async getProjectByUserId(userId) {
-    const projects = await Project.find({ projectManagerId: userId });
+    const projects = await Project.find({
+      $or: [{ projectMembers: { $in: userId } }, { projectManagerId: userId }],
+    });
     if (!projects) {
       throw new Error("No projects found for this user");
     }

@@ -5,6 +5,8 @@ const {
   BadRequestError,
 } = require("../core/response/error.response");
 const Column = require("../models/column.model");
+const Project = require("../models/project.model");
+const columnService = require("./column.service");
 
 class BoardService {
   static async createColumnAndAddToBoard({ boardId, columnData }) {
@@ -80,9 +82,37 @@ class BoardService {
       .lean();
 
     if (!board) throw new NotFoundError("Board not found");
+    board.columnIds = board.columnIds.map((column) => ({
+      ...column,
+      tasksOrderIds: column.tasksOrderIds.flat(),
+    }));
     return board;
   }
+  static async updateBoardData(id, boardData) {
+    const data = boardData.boardData;
 
+    if (!mongoose.Types.ObjectId.isValid(id))
+      throw new BadRequestError("Invalid Board ID");
+    if (!data) throw new BadRequestError("Board data is required");
+    const columnOrderIds = data.map((column) => {
+      columnService.updateColumn(column._id, {
+        ...column,
+        tasks: column.tasksOrderIds,
+        tasksOrderIds: column.tasksOrderIds,
+      });
+      return column._id;
+    });
+
+    const updatedBoard = await Board.findByIdAndUpdate(
+      id,
+      {
+        columnOrderIds: columnOrderIds,
+        columnIds: columnOrderIds,
+      },
+      { new: true }
+    ).populate("columnIds");
+    if (!updatedBoard) throw new NotFoundError("Board not found");
+  }
   static async updateBoard(id, data) {
     if (!id || !mongoose.Types.ObjectId.isValid(id))
       throw new BadRequestError("Valid Board ID is required");
@@ -127,8 +157,6 @@ class BoardService {
 
     return { deletedBoardId: boardId };
   }
-
-
 }
 
 module.exports = BoardService;

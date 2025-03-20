@@ -2,7 +2,6 @@ const { OK, CREATED } = require("../core/response/success.response");
 const projectService = require("../services/project.service");
 const { sendInviteEmail } = require("../services/email.service");
 const User = require("../models/user.model"); // Import User model
-console.log("User model:", User);
 
 const Project = require("../models/project.model"); // Import Project model
 const ProjectInvite = require("../models/projectInvite.model"); // Import ProjectInvite model
@@ -99,7 +98,6 @@ class ProjectController {
     try {
       const { projectId, userEmail } = req.body;
       const userId = req.user?.userId; // Xác thực người gửi
-      console.log("User Model:", User); // Kiểm tra User model
       if (!userId) {
         return res.status(401).json({ message: "Bạn chưa đăng nhập!" });
       }

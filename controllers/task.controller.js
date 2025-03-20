@@ -48,15 +48,10 @@ class TaskController {
   };
   assignTask = async (req, res) => {
     try {
-      console.log(req.params.id);
-
       const userId = req.user?.userId;
       const result = new OK({
         message: "Task assigned successfully",
-        metadata: await taskService.assignTask(
-          userId,
-          req?.params?.id,
-        ),
+        metadata: await taskService.assignTask(userId, req?.params?.id),
       });
       result.send(res);
     } catch (error) {
