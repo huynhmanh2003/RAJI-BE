@@ -175,7 +175,7 @@ class ProjectService {
   async getProjectByUserId(userId) {
     const projects = await Project.find({
       $or: [{ projectMembers: { $in: userId } }, { projectManagerId: userId }],
-    });
+    }).populate("projectBoards");
     if (!projects) {
       throw new Error("No projects found for this user");
     }
