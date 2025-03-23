@@ -2,7 +2,6 @@ const { OK, CREATED } = require("../core/response/success.response");
 const projectService = require("../services/project.service");
 const { sendInviteEmail } = require("../services/email.service");
 const User = require("../models/user.model"); // Import User model
-console.log("User model:", User);
 
 const Project = require("../models/project.model"); // Import Project model
 const ProjectInvite = require("../models/projectInvite.model"); // Import ProjectInvite model
@@ -74,7 +73,7 @@ class ProjectController {
       });
       result.send(res);
     } catch (error) {
-      res.status(405).send(error);  
+      res.status(405).send(error);
     }
   };
 
@@ -94,13 +93,11 @@ class ProjectController {
     result.send(res);
   };
 
-
   //  API gửi lời mời thành viên vào dự án qua email
   inviteMemberToProject = async (req, res, next) => {
     try {
       const { projectId, userEmail } = req.body;
       const userId = req.user?.userId; // Xác thực người gửi
-      console.log("User Model:", User); // Kiểm tra User model
       if (!userId) {
         return res.status(401).json({ message: "Bạn chưa đăng nhập!" });
       }
@@ -126,7 +123,7 @@ class ProjectController {
       });
 
       if (existingInvite) {
-        return res.status(400).json({ message: "User đã được mời rồi" });
+        return res.status(400).json({ message: "User Invitation Already" });
       }
 
       const invite = new ProjectInvite({ projectId, userId: user._id });
@@ -158,11 +155,16 @@ class ProjectController {
       }
 
       const project = await Project.findById(invite.projectId);
+      const user = await User.findById(invite.userId);
       console.log("Project found:", project);
 
       if (!project) {
         console.log("Project not found");
-        return res.status(404).json({ message: "Dự án không tồn tại" });
+        return res.status(404).json({ message: "Project not found" });
+      }
+      if (!user) {
+        console.log("User not found");
+        return res.status(404).json({ message: "User not found" });
       }
 
       // Kiểm tra xem projectMembers đã tồn tại chưa, nếu chưa thì khởi tạo
@@ -178,10 +180,19 @@ class ProjectController {
           .status(400)
           .json({ message: "Bạn đã là thành viên của dự án này" });
       }
+      // Kiểm tra xem project đã có trong user's project chưa để tránh trùng lặp
 
+      if (user.project.includes(invite.projectId)) {
+        console.log("User is already a member of the project.");
+        return res
+          .status(400)
+          .json({ message: "Bạn đã là thành viên của dự án này" });
+      }
       // Thêm user vào projectMembers
       project.projectMembers.push(invite.userId);
+      user.project.push(invite.projectId);
       await project.save();
+      await user.save();
 
       // Cập nhật trạng thái lời mời
       invite.status = "accepted";
@@ -195,6 +206,8 @@ class ProjectController {
     } catch (error) {
       console.error("Error:", error);
       next(error);
+    }
+  };
 
   getProjectByUserId = async (req, res, next) => {
     try {
@@ -208,9 +221,7 @@ class ProjectController {
       result.send(res);
     } catch (error) {
       res.status(405).send(error);
-
     }
   };
 }
-
 module.exports = new ProjectController();

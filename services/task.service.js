@@ -5,6 +5,7 @@ const {
   UnprocessableEntityError,
   BadRequestError,
 } = require("../core/response/error.response");
+const projectService = require("./project.service");
 
 class TaskService {
   async createTask({ userId, task }) {
@@ -52,14 +53,68 @@ class TaskService {
     return task;
   }
 
-  async deleteTask(id) {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestError("Invalid task ID");
+ // Xóa task (chỉ PM mới có quyền)
+ static async deleteTask({ taskId, userId }) {
+  const task = await Task.findById(taskId);
+  if (!task) {
+    throw new Error("Task not found");
+  }
+
+  // Kiểm tra quyền PM từ column mà task thuộc về
+  const column = await Column.findById(task.columnId);
+  if (!column) {
+    throw new Error("Column not found");
+  }
+
+  const board = await Board.findById(column.boardId);
+  if (!board) {
+    throw new Error("Board not found");
+  }
+
+  const project = await Project.findById(board.projectId);
+  if (!project || project.projectManagerId.toString() !== userId) {
+    throw new Error("You are not authorized to delete this task");
+  }
+  // Xóa task khỏi danh sách tasks trong column
+  await Column.findByIdAndUpdate(column._id, { $pull: { tasks: taskId } });
+
+  // Xóa task
+  await Task.findByIdAndDelete(taskId);
+
+  return { deletedTaskId: taskId };
+}
+
+  async assignTask(userId, taskId) {
+    if (
+      !mongoose.Types.ObjectId.isValid(taskId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      throw new BadRequestError("Invalid task ID, user ID, or project ID");
     }
-    const task = await Task.findByIdAndDelete(id);
+    const task = await Task.findByIdAndUpdate(
+      taskId,
+      { $push: { assigneeId: userId } },
+      { new: true }
+    ).populate("assigneeId");
     if (!task) throw new NotFoundError("Task not found");
     return task;
   }
+  async unassignTask(userId, taskId) {
+    if (
+      !mongoose.Types.ObjectId.isValid(taskId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      throw new BadRequestError("Invalid task ID, user ID, or project ID");
+    }
+    const task = await Task.findByIdAndUpdate(
+      taskId,
+      { $pull: { assigneeId: userId } },
+      { new: true }
+    ).populate("assigneeId");
+    if (!task) throw new NotFoundError("Task not found");
+    return task;
+  }
+
 }
 
 module.exports = new TaskService();

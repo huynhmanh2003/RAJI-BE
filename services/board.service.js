@@ -5,6 +5,8 @@ const {
   BadRequestError,
 } = require("../core/response/error.response");
 const Column = require("../models/column.model");
+const Project = require("../models/project.model");
+const columnService = require("./column.service");
 
 class BoardService {
   static async createColumnAndAddToBoard({ boardId, columnData }) {
@@ -80,9 +82,37 @@ class BoardService {
       .lean();
 
     if (!board) throw new NotFoundError("Board not found");
+    board.columnIds = board.columnIds.map((column) => ({
+      ...column,
+      tasksOrderIds: column.tasksOrderIds.flat(),
+    }));
     return board;
   }
+  static async updateBoardData(id, boardData) {
+    const data = boardData.boardData;
 
+    if (!mongoose.Types.ObjectId.isValid(id))
+      throw new BadRequestError("Invalid Board ID");
+    if (!data) throw new BadRequestError("Board data is required");
+    const columnOrderIds = data.map((column) => {
+      columnService.updateColumn(column._id, {
+        ...column,
+        tasks: column.tasksOrderIds,
+        tasksOrderIds: column.tasksOrderIds,
+      });
+      return column._id;
+    });
+
+    const updatedBoard = await Board.findByIdAndUpdate(
+      id,
+      {
+        columnOrderIds: columnOrderIds,
+        columnIds: columnOrderIds,
+      },
+      { new: true }
+    ).populate("columnIds");
+    if (!updatedBoard) throw new NotFoundError("Board not found");
+  }
   static async updateBoard(id, data) {
     if (!id || !mongoose.Types.ObjectId.isValid(id))
       throw new BadRequestError("Valid Board ID is required");
@@ -96,13 +126,36 @@ class BoardService {
     return board;
   }
 
-  static async deleteBoard(id) {
-    if (!id || !mongoose.Types.ObjectId.isValid(id))
-      throw new BadRequestError("Valid Board ID is required");
+  static async deleteBoard({ boardId, userId }) {
+    const board = await Board.findById(boardId);
+    if (!board) {
+      throw new Error("Board not found");
+    }
 
-    const board = await Board.findByIdAndDelete(id);
-    if (!board) throw new NotFoundError("Board not found");
-    return board;
+    // Kiểm tra quyền PM từ project mà board thuộc về
+    const project = await Project.findById(board.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    if (project.projectManagerId.toString() !== userId) {
+      throw new Error("You are not authorized to delete this board");
+    }
+
+    // Xóa tất cả columns trong board
+    for (const columnId of board.columnOrderIds) {
+      await ColumnService.deleteColumn({ columnId, userId });
+    }
+
+    // Xóa board khỏi danh sách projectBoards trong project
+    await Project.findByIdAndUpdate(project._id, {
+      $pull: { projectBoards: boardId },
+    });
+
+    // Xóa board
+    await Board.findByIdAndDelete(boardId);
+
+    return { deletedBoardId: boardId };
   }
 }
 
