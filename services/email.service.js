@@ -1,17 +1,32 @@
 const transporter = require("../config/email"); // Import transporter từ config
 
-const sendInviteEmail = async (toEmail, inviteId) => {
-  const acceptLink = `${process.env.BASE_URL}/api/projects/invite/${inviteId}/accept`;
+const sendInviteEmail = async (clientURL, toEmail, inviteId) => {
+  const acceptLink = `${clientURL}/api/projects/invite/${inviteId}/accept`;
+
+  // Load and compile HTML template
+  const loadTemplate = (filePath, replacements) => {
+    let template = fs.readFileSync(filePath, "utf8");
+    for (let key in replacements) {
+      template = template.replace(
+        new RegExp(`{{${key}}}`, "g"),
+        replacements[key]
+      );
+    }
+    return template;
+  };
+
+  const templatePath = path.join(
+    __dirname,
+    "templates",
+    "project-invitation.html"
+  );
+  const emailHtml = loadTemplate(templatePath, { resetLink });
 
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: toEmail,
     subject: "Bạn được mời tham gia vào một dự án!",
-    html: `
-            <p>Bạn đã được mời tham gia một dự án.</p>
-            <p>Nhấn vào link sau để chấp nhận lời mời:</p>
-            <a href="${acceptLink}" target="_blank">${acceptLink}</a>
-        `,
+    html: emailHtml,
   };
 
   await transporter.sendMail(mailOptions);
