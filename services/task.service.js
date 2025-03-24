@@ -27,8 +27,9 @@ class TaskService {
   }
 
   async getAllTasks() {
-    return await Task.find().populate().lean();
+   
     return await Task.find().populate("assigneeId").lean();
+
   }
 
   async findTask(id) {
@@ -54,7 +55,7 @@ class TaskService {
     return task;
   }
 
- // Xóa task (chỉ PM mới có quyền)
+
   async deleteTask( taskId, userId ) {
   console.log("task_id:",taskId);
   const task = await Task.findById(taskId);
@@ -67,6 +68,7 @@ class TaskService {
 
     return { deletedTaskId: taskId };
   }
+
 
   async assignTask(userId, taskId) {
     if (
