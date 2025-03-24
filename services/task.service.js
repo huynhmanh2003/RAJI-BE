@@ -27,7 +27,9 @@ class TaskService {
   }
 
   async getAllTasks() {
-    return await Task.find().populate().lean();
+   
+    return await Task.find().populate("assigneeId").lean();
+
   }
 
   async findTask(id) {
@@ -53,36 +55,20 @@ class TaskService {
     return task;
   }
 
-  // Xóa task (chỉ PM mới có quyền)
-  static async deleteTask({ taskId, userId }) {
-    const task = await Task.findById(taskId);
-    if (!task) {
-      throw new Error("Task not found");
-    }
 
-    // Kiểm tra quyền PM từ column mà task thuộc về
-    const column = await Column.findById(task.columnId);
-    if (!column) {
-      throw new Error("Column not found");
-    }
-
-    const board = await Board.findById(column.boardId);
-    if (!board) {
-      throw new Error("Board not found");
-    }
-
-    const project = await Project.findById(board.projectId);
-    if (!project || project.projectManagerId.toString() !== userId) {
-      throw new Error("You are not authorized to delete this task");
-    }
-    // Xóa task khỏi danh sách tasks trong column
-    await Column.findByIdAndUpdate(column._id, { $pull: { tasks: taskId } });
-
+  async deleteTask( taskId, userId ) {
+  console.log("task_id:",taskId);
+  const task = await Task.findById(taskId);
+  if (!task) {
+    throw new Error("Task not found");
+  }
+  
     // Xóa task
     await Task.findByIdAndDelete(taskId);
 
     return { deletedTaskId: taskId };
   }
+
 
   async assignTask(userId, taskId) {
     if (

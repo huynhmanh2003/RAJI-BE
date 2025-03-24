@@ -141,31 +141,32 @@ class BoardService {
     return board;
   }
 
-  static async deleteBoard({ boardId, userId }) {
+  static async deleteBoard( boardId, userId ) {
+    console.log("boardId:",boardId);
     const board = await Board.findById(boardId);
     if (!board) {
       throw new Error("Board not found");
     }
 
     // Kiểm tra quyền PM từ project mà board thuộc về
-    const project = await Project.findById(board.projectId);
-    if (!project) {
-      throw new Error("Project not found");
-    }
+    // const project = await Project.findById(board.projectId);
+    // if (!project) {
+    //   throw new Error("Project not found");
+    // }
 
-    if (project.projectManagerId.toString() !== userId) {
-      throw new Error("You are not authorized to delete this board");
-    }
+    // if (project.projectManagerId.toString() !== userId) {
+    //   throw new Error("You are not authorized to delete this board");
+    // }
 
-    // Xóa tất cả columns trong board
-    for (const columnId of board.columnOrderIds) {
-      await ColumnService.deleteColumn({ columnId, userId });
-    }
+    // // Xóa tất cả columns trong board
+    // for (const columnId of board.columnOrderIds) {
+    //   await ColumnService.deleteColumn({ columnId, userId });
+    // }
 
-    // Xóa board khỏi danh sách projectBoards trong project
-    await Project.findByIdAndUpdate(project._id, {
-      $pull: { projectBoards: boardId },
-    });
+    // // Xóa board khỏi danh sách projectBoards trong project
+    // await Project.findByIdAndUpdate(project._id, {
+    //   $pull: { projectBoards: boardId },
+    // });
 
     // Xóa board
     await Board.findByIdAndDelete(boardId);

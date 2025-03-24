@@ -52,9 +52,10 @@ class ColumnController {
   };
 
   deleteColumn = async (req, res, next) => {
+    const userId = req.user?.userId;
     const result = new OK({
       message: "Column deleted successfully",
-      metadata: await columnService.deleteColumn(req.params.id),
+      metadata: await columnService.deleteColumn(req.params.id,userId),
     });
     result.send(res);
   };
