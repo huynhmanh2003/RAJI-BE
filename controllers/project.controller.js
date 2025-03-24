@@ -132,7 +132,7 @@ class ProjectController {
       await invite.save();
 
       // Gửi email lời mời
-      await sendInviteEmail(userEmail, invite._id);
+      await sendInviteEmail(req.headers.origin, userEmail, invite._id);
 
       res.status(200).json({ message: "Lời mời đã được gửi thành công" });
     } catch (error) {

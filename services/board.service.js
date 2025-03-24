@@ -77,7 +77,22 @@ class BoardService {
     const board = await Board.findById(id)
       .populate({
         path: "columnIds",
-        populate: "tasks",
+        populate: {
+          path: "tasks",
+          populate: [
+            {
+              path: "comments",
+              populate: {
+                path: "userId",
+                select: "username", // Select only the fields you need
+              },
+            },
+            {
+              path: "assigneeId",
+              select: "username", // Select only the fields you need
+            },
+          ],
+        },
       })
       .lean();
 

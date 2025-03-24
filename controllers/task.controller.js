@@ -71,5 +71,20 @@ class TaskController {
       res.status(400).send(error.message);
     }
   };
+  addCommentToTask = async (req, res) => {
+    const userId = req.user?.userId;
+    const { id } = req.params;
+    const { content } = req.body;
+
+    const result = new CREATED({
+      message: "Comment created successfully",
+      metadata: await taskService.addCommentToTask(id, {
+        content,
+        userId,
+        taskId: id,
+      }),
+    });
+    result.send(res);
+  };
 }
 module.exports = new TaskController();
