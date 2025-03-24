@@ -6,6 +6,7 @@ const {
   BadRequestError,
 } = require("../core/response/error.response");
 const projectService = require("./project.service");
+const commentModel = require("../models/comment.model");
 
 class TaskService {
   async createTask({ userId, task }) {
@@ -26,7 +27,7 @@ class TaskService {
   }
 
   async getAllTasks() {
-    return await Task.find().populate("userId", "username").lean();
+    return await Task.find().populate().lean();
   }
 
   async findTask(id) {
@@ -45,44 +46,43 @@ class TaskService {
     if (data.title === "" || data.description === "") {
       throw new BadRequestError("Title and description cannot be empty");
     }
-    const task = await Task.findByIdAndUpdate(id, data, { new: true }).populate(
-      "userId",
-      "username"
-    );
+    const task = await Task.findByIdAndUpdate(id, data, {
+      new: true,
+    });
     if (!task) throw new NotFoundError("Task not found");
     return task;
   }
 
- // Xóa task (chỉ PM mới có quyền)
- static async deleteTask({ taskId, userId }) {
-  const task = await Task.findById(taskId);
-  if (!task) {
-    throw new Error("Task not found");
+  // Xóa task (chỉ PM mới có quyền)
+  static async deleteTask({ taskId, userId }) {
+    const task = await Task.findById(taskId);
+    if (!task) {
+      throw new Error("Task not found");
+    }
+
+    // Kiểm tra quyền PM từ column mà task thuộc về
+    const column = await Column.findById(task.columnId);
+    if (!column) {
+      throw new Error("Column not found");
+    }
+
+    const board = await Board.findById(column.boardId);
+    if (!board) {
+      throw new Error("Board not found");
+    }
+
+    const project = await Project.findById(board.projectId);
+    if (!project || project.projectManagerId.toString() !== userId) {
+      throw new Error("You are not authorized to delete this task");
+    }
+    // Xóa task khỏi danh sách tasks trong column
+    await Column.findByIdAndUpdate(column._id, { $pull: { tasks: taskId } });
+
+    // Xóa task
+    await Task.findByIdAndDelete(taskId);
+
+    return { deletedTaskId: taskId };
   }
-
-  // Kiểm tra quyền PM từ column mà task thuộc về
-  const column = await Column.findById(task.columnId);
-  if (!column) {
-    throw new Error("Column not found");
-  }
-
-  const board = await Board.findById(column.boardId);
-  if (!board) {
-    throw new Error("Board not found");
-  }
-
-  const project = await Project.findById(board.projectId);
-  if (!project || project.projectManagerId.toString() !== userId) {
-    throw new Error("You are not authorized to delete this task");
-  }
-  // Xóa task khỏi danh sách tasks trong column
-  await Column.findByIdAndUpdate(column._id, { $pull: { tasks: taskId } });
-
-  // Xóa task
-  await Task.findByIdAndDelete(taskId);
-
-  return { deletedTaskId: taskId };
-}
 
   async assignTask(userId, taskId) {
     if (
@@ -114,7 +114,22 @@ class TaskService {
     if (!task) throw new NotFoundError("Task not found");
     return task;
   }
+  async addCommentToTask(taskId, comment) {
+    console.log("taskId", comment);
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      throw new BadRequestError("Invalid task ID");
+    }
+    if (!comment.content) {
+      throw new BadRequestError("Comment content is required");
+    }
+    const newComment = await commentModel.create(comment);
+    const task = await Task.findById(taskId);
+    if (!task) throw new NotFoundError("Task not found");
+    task.comments.push(newComment._id);
+    await task.save();
+    return task;
+  }
 }
 
 module.exports = new TaskService();

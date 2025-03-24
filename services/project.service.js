@@ -85,10 +85,17 @@ class ProjectService {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new Error("Invalid userId ID");
     }
-    const project = await Project.findById(projectId).populate({
-      path: "projectBoards",
-      select: "_id title",
-    });
+
+    const project = await Project.findById(projectId).populate([
+      {
+        path: "projectBoards",
+        select: "_id title",
+      },
+      {
+        path: "projectMembers",
+        select: "username ",
+      },
+    ]);
     if (!project) {
       throw new Error("Project not found");
     }
@@ -190,6 +197,16 @@ class ProjectService {
     return project.projectMembers.some(
       (memberId) => memberId.toString() === userId
     );
+  }
+  async getMembers(projectId) {
+    const project = await Project.findById(projectId).populate(
+      "projectMembers",
+      "username "
+    );
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    return project.projectMembers;
   }
 }
 

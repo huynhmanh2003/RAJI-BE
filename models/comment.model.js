@@ -6,37 +6,37 @@ const commentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Task",
       required: true,
-      index: true
+      index: true,
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true
+      required: true,
     },
     parentCommentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Comment",
       default: null,
-      index: true
+      index: true,
     },
     content: {
       type: String,
-      required: true
+      required: true,
     },
     imageUrl: {
       type: String,
-      default: null
+      default: null,
     },
     left: {
       type: Number,
-      required: true,
-      index: true
+      required: false,
+      index: true,
     },
     right: {
       type: Number,
-      required: true,
-      index: true
-    }
+      required: false,
+      index: true,
+    },
   },
   { timestamps: true }
 );
