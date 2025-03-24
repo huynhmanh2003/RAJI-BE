@@ -7,6 +7,8 @@ const {
   BadRequestError,
 } = require("../core/response/error.response");
 const Column = require("../models/column.model");
+const Project = require("../models/project.model");
+const columnService = require("./column.service");
 
 class BoardService {
   static async createColumnAndAddToBoard({ boardId, columnData }) {
@@ -28,9 +30,11 @@ class BoardService {
     const savedColumn = await newColumn.save();
     const updatedBoard = await Board.findByIdAndUpdate(
       boardId,
-      { $push: { columnOrderIds: savedColumn._id } },
+      {
+        $push: { columnIds: savedColumn._id, columnOrderIds: savedColumn._id },
+      },
       { new: true }
-    ).populate("columnOrderIds memberIds");
+    ).populate("columnIds");
 
     if (!updatedBoard) {
       await Column.findByIdAndDelete(savedColumn._id);
@@ -116,7 +120,7 @@ class BoardService {
   }
 
   static async getAllBoards() {
-    return await Board.find().populate("memberIds columnOrderIds").lean();
+    return await Board.find().lean(); // Bỏ populate
   }
 
   static async findBoard(id) {
@@ -124,18 +128,44 @@ class BoardService {
       throw new BadRequestError("Valid Board ID is required");
 
     const board = await Board.findById(id)
-      .populate("memberIds columnOrderIds")
+      .populate({
+        path: "columnIds",
+        populate: "tasks",
+      })
       .lean();
+
     if (!board) throw new NotFoundError("Board not found");
+    board.columnIds = board.columnIds.map((column) => ({
+      ...column,
+      tasksOrderIds: column.tasksOrderIds.flat(),
+    }));
     return board;
   }
+  static async updateBoardData(id, boardData) {
+    const data = boardData.boardData;
 
-  static async findProject(projectId) {
-    const project = await Project.findById(projectId).populate("projectMembers projectManagerId");
-    if (!project) throw new NotFoundError("Project not found");
-    return project;
+    if (!mongoose.Types.ObjectId.isValid(id))
+      throw new BadRequestError("Invalid Board ID");
+    if (!data) throw new BadRequestError("Board data is required");
+    const columnOrderIds = data.map((column) => {
+      columnService.updateColumn(column._id, {
+        ...column,
+        tasks: column.tasksOrderIds,
+        tasksOrderIds: column.tasksOrderIds,
+      });
+      return column._id;
+    });
+
+    const updatedBoard = await Board.findByIdAndUpdate(
+      id,
+      {
+        columnOrderIds: columnOrderIds,
+        columnIds: columnOrderIds,
+      },
+      { new: true }
+    ).populate("columnIds");
+    if (!updatedBoard) throw new NotFoundError("Board not found");
   }
-
   static async updateBoard(id, data) {
     if (!id || !mongoose.Types.ObjectId.isValid(id))
       throw new BadRequestError("Valid Board ID is required");
@@ -178,36 +208,36 @@ class BoardService {
     return board;
   }
 
-  static async deleteBoard(id) {
-    if (!id || !mongoose.Types.ObjectId.isValid(id))
-      throw new BadRequestError("Valid Board ID is required");
+  static async deleteBoard({ boardId, userId }) {
+    const board = await Board.findById(boardId);
+    if (!board) {
+      throw new Error("Board not found");
+    }
 
-    const board = await Board.findById(id).populate("memberIds");
-    if (!board) throw new NotFoundError("Board not found");
+    // Kiểm tra quyền PM từ project mà board thuộc về
+    const project = await Project.findById(board.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
 
-    await board.deleteOne();
-    await ProjectService.removeBoardFromProject(board.projectId, id);
+    if (project.projectManagerId.toString() !== userId) {
+      throw new Error("You are not authorized to delete this board");
+    }
 
-    const project = await Project.findById(board.projectId).populate("projectManagerId");
-    const memberIds = (board.memberIds || []).map((member) => member._id.toString());
-    const userIds = [...new Set([...memberIds, project.projectManagerId.toString()])];
-    const io = global._io;
-    const userSocketMap = global._userSocketMap;
-    const timestamp = new Date().toISOString();
-    userIds.forEach((uid) => {
-      const socketId = userSocketMap.get(uid);
-      if (socketId) {
-        io.to(socketId).emit("notification", {
-          message: `Bảng "${board.title}" trong dự án "${project.projectName}" đã bị xóa.`,
-          type: "board",
-          unread: true,
-          timestamp: timestamp,
-          userId: uid,
-        });
-      }
+    // Xóa tất cả columns trong board
+    for (const columnId of board.columnOrderIds) {
+      await ColumnService.deleteColumn({ columnId, userId });
+    }
+
+    // Xóa board khỏi danh sách projectBoards trong project
+    await Project.findByIdAndUpdate(project._id, {
+      $pull: { projectBoards: boardId },
     });
 
-    return board;
+    // Xóa board
+    await Board.findByIdAndDelete(boardId);
+
+    return { deletedBoardId: boardId };
   }
 }
 

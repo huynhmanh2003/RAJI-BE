@@ -32,11 +32,15 @@ class ColumnController {
   };
 
   getColumnById = async (req, res, next) => {
-    const result = new OK({
-      message: "Column retrieved successfully",
-      metadata: await columnService.getColumnById(req.params.id),
-    });
-    result.send(res);
+    try {
+      const result = new OK({
+        message: "Column retrieved successfully",
+        metadata: await columnService.getColumnById(req.params.id),
+      });
+      result.send(res);
+    } catch (error) {
+      res.status(404).send({ message: error.message });
+    }
   };
 
   updateColumn = async (req, res, next) => {

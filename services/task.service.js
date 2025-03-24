@@ -7,6 +7,7 @@ const {
   UnprocessableEntityError,
   BadRequestError,
 } = require("../core/response/error.response");
+const projectService = require("./project.service");
 
 class TaskService {
   async createTask({ userId, task }) {
@@ -85,45 +86,68 @@ class TaskService {
       "assigneeId",
       "username"
     );
-    if (!updatedTask) throw new NotFoundError("Task not found");
-
-    // Gửi thông báo
-    const column = await Column.findOne({ tasks: id }).populate("tasks");
-    if (column) {
-      const board = await Board.findOne({ columnOrderIds: column._id }).populate("projectId");
-      if (board) {
-        const project = await board.projectId;
-        const memberIds = (board.memberIds || []).map((member) => member._id.toString());
-        const oldAssigneeIds = (taskBeforeUpdate.assigneeId || []).map((user) => user._id.toString());
-        const newAssigneeIds = (data.assigneeId || []).map((id) => id.toString());
-        const userIds = [...new Set([...memberIds, ...oldAssigneeIds, ...newAssigneeIds, project.projectManagerId.toString()])];
-        const io = global._io;
-        const userSocketMap = global._userSocketMap;
-        const timestamp = new Date().toISOString();
-        userIds.forEach((uid) => {
-          const socketId = userSocketMap.get(uid);
-          if (socketId) {
-            io.to(socketId).emit("notification", {
-              message: `Nhiệm vụ "${updatedTask.title}" trong cột "${column.title}" đã được cập nhật.`,
-              type: "task",
-              unread: true,
-              timestamp: timestamp,
-              userId: uid,
-            });
-          }
-        });
-      }
-    }
-
-    return updatedTask;
+    if (!task) throw new NotFoundError("Task not found");
+    return task;
   }
 
-  async deleteTask(id) {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestError("Invalid task ID");
-    }
+ // Xóa task (chỉ PM mới có quyền)
+ static async deleteTask({ taskId, userId }) {
+  const task = await Task.findById(taskId);
+  if (!task) {
+    throw new Error("Task not found");
+  }
 
-    const task = await Task.findById(id).populate("assigneeId");
+  // Kiểm tra quyền PM từ column mà task thuộc về
+  const column = await Column.findById(task.columnId);
+  if (!column) {
+    throw new Error("Column not found");
+  }
+
+  const board = await Board.findById(column.boardId);
+  if (!board) {
+    throw new Error("Board not found");
+  }
+
+  const project = await Project.findById(board.projectId);
+  if (!project || project.projectManagerId.toString() !== userId) {
+    throw new Error("You are not authorized to delete this task");
+  }
+  // Xóa task khỏi danh sách tasks trong column
+  await Column.findByIdAndUpdate(column._id, { $pull: { tasks: taskId } });
+
+  // Xóa task
+  await Task.findByIdAndDelete(taskId);
+
+  return { deletedTaskId: taskId };
+}
+
+  async assignTask(userId, taskId) {
+    if (
+      !mongoose.Types.ObjectId.isValid(taskId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      throw new BadRequestError("Invalid task ID, user ID, or project ID");
+    }
+    const task = await Task.findByIdAndUpdate(
+      taskId,
+      { $push: { assigneeId: userId } },
+      { new: true }
+    ).populate("assigneeId");
+    if (!task) throw new NotFoundError("Task not found");
+    return task;
+  }
+  async unassignTask(userId, taskId) {
+    if (
+      !mongoose.Types.ObjectId.isValid(taskId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      throw new BadRequestError("Invalid task ID, user ID, or project ID");
+    }
+    const task = await Task.findByIdAndUpdate(
+      taskId,
+      { $pull: { assigneeId: userId } },
+      { new: true }
+    ).populate("assigneeId");
     if (!task) throw new NotFoundError("Task not found");
 
     await Task.findByIdAndDelete(id);
@@ -157,6 +181,7 @@ class TaskService {
 
     return task;
   }
+
 }
 
 module.exports = new TaskService();
