@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
 const transporter = require("../config/email"); // Import module gửi email
 const authMiddleware = require("../middleware/auth.middleware");
+const { loadTemplate } = require("../utils/emailTemplate");
 const { default: mongoose } = require("mongoose");
 
 const router = express.Router();
@@ -20,12 +21,18 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Email already exists" });
 
     // Tạo user mới
-    const newUser = new User({ username, email, password, role, boards });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new User({
+      username,
+      email,
+      password: hashedPassword,
+      role,
+      boards,
+    });
     await newUser.save();
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
-
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -45,12 +52,13 @@ router.post("/login", async (req, res) => {
       },
     });
 
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    if (!user)
+      return res.status(400).json({ message: "Invalid email or password" });
 
     // Kiểm tra mật khẩu
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({ message: "Invalid email or password" });
 
     // Tạo JWT
     const token = jwt.sign(
@@ -82,22 +90,22 @@ router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
-
     if (!user) return res.status(404).json({ message: "Email not found" });
 
-    // Tạo token reset password (có hạn 15 phút)
     const resetToken = jwt.sign({ userId: user._id }, SECRET_KEY, {
       expiresIn: "15m",
     });
+    const clientURL = req.headers.origin;
+    const resetLink = `${clientURL}/reset-password?token=${resetToken}`;
+    const template = loadTemplate("forgot-password-template.html", {
+      RESET_LINK: resetLink,
+    });
 
-    const resetLink = `http://localhost:3000/reset-password/${resetToken}`;
-
-    // Gửi email
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Reset Password",
-      text: `Click vào link sau để đặt lại mật khẩu: ${resetLink}`,
+      html: template,
     });
 
     res.status(200).json({ message: "Reset link sent to email" });
@@ -110,12 +118,13 @@ router.post("/forgot-password", async (req, res) => {
 router.post("/reset-password", async (req, res) => {
   try {
     const { token, newPassword } = req.body;
+    console.log("newPassword", newPassword);
     const decoded = jwt.verify(token, SECRET_KEY);
+
     const user = await User.findById(decoded.userId);
 
-    if (!user) return res.status(400).json({ message: "Invalid token" });
+    if (!user) return res.status(400).json({ message: "Invalid user id" });
 
-    // Cập nhật mật khẩu mới
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
