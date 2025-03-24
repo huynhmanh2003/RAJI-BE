@@ -40,9 +40,10 @@ class TaskController {
   };
 
   deleteTask = async (req, res, next) => {
+    const userId = req.user?.userId;
     const result = new OK({
       message: "Task deleted successfully",
-      metadata: await taskService.deleteTask(req.params.id),
+      metadata: await taskService.deleteTask(req.params.id, userId),
     });
     result.send(res);
   };

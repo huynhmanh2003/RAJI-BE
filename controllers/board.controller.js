@@ -83,9 +83,10 @@ class BoardController {
   };
 
   deleteBoard = async (req, res, next) => {
+    const userId = req.user?.userId;
     const result = new OK({
       message: "Board deleted successfully",
-      metadata: await boardService.deleteBoard(req.params.id),
+      metadata: await boardService.deleteBoard(req.params.id,userId),
     });
     result.send(res);
   };
