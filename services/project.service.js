@@ -14,7 +14,7 @@ class ProjectService {
 
     const newProject = new Project({
       projectName,
-      projectMembers: projectMembers || [],
+      projectMembers: projectMembers || [userId],
       projectManagerId: userId,
       projectBoards: projectBoards || [],
     });
@@ -132,7 +132,9 @@ class ProjectService {
   }
 
   // Xóa project (chỉ PM mới được xóa)
-  async deleteProject( projectId, userId ) {
+
+  async deleteProject(projectId, userId) {
+
     const project = await Project.findById(projectId);
     if (!project) {
       throw new Error("Project not found");
@@ -158,7 +160,9 @@ class ProjectService {
   }
 
   // Xóa board khỏi project
-  static async deleteBoardFromProject( projectId, userId ) {
+
+  static async deleteBoardFromProject(projectId, userId) {
+
     const project = await Project.findById(projectId);
     if (!project) {
       throw new Error("Project not found");

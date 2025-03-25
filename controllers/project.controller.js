@@ -7,7 +7,7 @@ const Project = require("../models/project.model"); // Import Project model
 const ProjectInvite = require("../models/projectInvite.model"); // Import ProjectInvite model
 
 class ProjectController {
-  createProject = async (req, res, next) => {
+  createProject = async (req, res) => {
     const userId = req.user?.userId;
     if (!userId) throw new Error("User not authenticated");
 
@@ -21,7 +21,7 @@ class ProjectController {
     result.send(res);
   };
 
-  addBoardToProject = async (req, res, next) => {
+  addBoardToProject = async (req, res) => {
     try {
       const projectId = req.params?.id;
       const userId = req.user?.userId;
@@ -50,7 +50,7 @@ class ProjectController {
     }
   };
 
-  getAllProjects = async (req, res, next) => {
+  getAllProjects = async (req, res) => {
     const result = new OK({
       message: "Projects retrieved successfully",
       metadata: await projectService.getAllProjects(),
@@ -58,7 +58,7 @@ class ProjectController {
     result.send(res);
   };
 
-  getProjectById = async (req, res, next) => {
+  getProjectById = async (req, res) => {
     try {
       const userId = req.user?.userId;
 
@@ -77,7 +77,7 @@ class ProjectController {
     }
   };
 
-  updateProject = async (req, res, next) => {
+  updateProject = async (req, res) => {
     const result = new OK({
       message: "Project updated successfully",
       metadata: await projectService.updateProject(req.params.id, req.body),
@@ -85,12 +85,14 @@ class ProjectController {
     result.send(res);
   };
 
-  deleteProject = async (req, res, next) => {
-   // const boardId = req.board?.boardId;
+
+  deleteProject = async (req, res) => {
+    // const boardId = req.board?.boardId;
     const userId = req.user?.userId;
     const result = new OK({
       message: "Project deleted successfully",
-      metadata: await projectService.deleteProject(req.params.id,userId),
+      metadata: await projectService.deleteProject(req.params.id, userId),
+
     });
     result.send(res);
   };
@@ -99,7 +101,7 @@ class ProjectController {
   inviteMemberToProject = async (req, res, next) => {
     try {
       const { projectId, userEmail } = req.body;
-      const userId = req.user?.userId; // Xác thực người gửi
+      const userId = req.user?.userId;
       if (!userId) {
         return res.status(401).json({ message: "Bạn chưa đăng nhập!" });
       }
@@ -110,9 +112,9 @@ class ProjectController {
           .json({ message: "Project ID và Email là bắt buộc" });
       }
 
-      const user = await User.findOne({ email: userEmail });
-      console.log("userEmail received:", userEmail);
-      if (!user) {
+      const invitedUser = await User.findOne({ email: userEmail });
+
+      if (!invitedUser) {
         return res
           .status(404)
           .json({ message: "Không tìm thấy người dùng với email này" });
@@ -120,7 +122,7 @@ class ProjectController {
 
       const existingInvite = await ProjectInvite.findOne({
         projectId,
-        userId: user._id,
+        userId: invitedUser._id,
         status: "pending",
       });
 
@@ -128,7 +130,7 @@ class ProjectController {
         return res.status(400).json({ message: "User Invitation Already" });
       }
 
-      const invite = new ProjectInvite({ projectId, userId: user._id });
+      const invite = new ProjectInvite({ projectId, userId: invitedUser._id });
       await invite.save();
 
       // Gửi email lời mời
@@ -143,52 +145,44 @@ class ProjectController {
   //  API chấp nhận lời mời tham gia dự án
   acceptInvite = async (req, res, next) => {
     try {
-      console.log("Accept Invite API called!");
       console.log("Invite ID:", req.params.inviteId);
 
       const { inviteId } = req.params;
       const invite = await ProjectInvite.findById(inviteId);
 
       if (!invite || invite.status !== "pending") {
-        console.log("Invalid or expired invite");
         return res
           .status(400)
-          .json({ message: "Lời mời không hợp lệ hoặc đã hết hạn" });
+          .json({ message: "Invalid or expired invite" });
       }
 
       const project = await Project.findById(invite.projectId);
       const user = await User.findById(invite.userId);
-      console.log("Project found:", project);
 
       if (!project) {
-        console.log("Project not found");
         return res.status(404).json({ message: "Project not found" });
       }
       if (!user) {
-        console.log("User not found");
         return res.status(404).json({ message: "User not found" });
       }
 
       // Kiểm tra xem projectMembers đã tồn tại chưa, nếu chưa thì khởi tạo
       if (!Array.isArray(project.projectMembers)) {
-        console.log("projectMembers field is missing, initializing it.");
         project.projectMembers = [];
       }
 
       // Kiểm tra xem user đã có trong projectMembers chưa để tránh trùng lặp
       if (project.projectMembers.includes(invite.userId)) {
-        console.log("User is already a member of the project.");
         return res
           .status(400)
-          .json({ message: "Bạn đã là thành viên của dự án này" });
+          .json({ message: "User is already a member of the project." });
       }
       // Kiểm tra xem project đã có trong user's project chưa để tránh trùng lặp
 
       if (user.project.includes(invite.projectId)) {
-        console.log("User is already a member of the project.");
         return res
           .status(400)
-          .json({ message: "Bạn đã là thành viên của dự án này" });
+          .json({ message: "User is already a member of the project." });
       }
       // Thêm user vào projectMembers
       project.projectMembers.push(invite.userId);
@@ -200,18 +194,52 @@ class ProjectController {
       invite.status = "accepted";
       await invite.save();
 
-      console.log("User joined project successfully!");
-
       res
         .status(200)
-        .json({ message: "Bạn đã tham gia dự án thành công!", project });
+        .json({ message: "Joined project successfully!", project });
     } catch (error) {
       console.error("Error:", error);
       next(error);
     }
   };
 
-  getProjectByUserId = async (req, res, next) => {
+  getProjectMembers = async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      if (!projectId) {
+        return res.status(400).json({ message: "Project ID is required" });
+      }
+
+      const project = await Project.findById(projectId)
+        .populate("projectMembers", "username email role");
+
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const memberIds = project.projectMembers.map(member => member._id);
+      const invites = await ProjectInvite.find({ projectId, userId: { $in: memberIds } });
+
+      const membersWithStatus = project.projectMembers.map(member => {
+        const invite = invites.find(inv => inv.userId.toString() === member._id.toString());
+        return {
+          ...member.toObject(),
+          inviteStatus: invite ? invite.status : "accepted",
+        };
+      });
+
+      res.status(200).json({
+        message: "Project members retrieved successfully",
+        metadata: membersWithStatus,
+      });
+
+    } catch (error) {
+      console.error("Error retrieving project members:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  };
+
+  getProjectByUserId = async (req, res) => {
     try {
       const userId = req.user?.userId;
 
