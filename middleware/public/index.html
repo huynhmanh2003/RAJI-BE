@@ -135,6 +135,21 @@
             );
           }
         });
+        socket.on("task:unassign", (data) => {
+          console.log("Received task unassign notification:", data);
+          notifications.push({ ...data, id: Date.now(), read: false });
+          updateNotifications();
+        });
+        socket.on("task:assign", (data) => {
+          console.log("Received task unassign notification:", data);
+          notifications.push({ ...data, id: Date.now(), read: false });
+          updateNotifications();
+        });
+        socket.on("task:comment", (data) => {
+          console.log("Received comment notification:", data);
+          notifications.push({ ...data, id: Date.now(), read: false });
+          updateNotifications();
+        });
       }
 
       function toggleNotifications() {

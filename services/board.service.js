@@ -141,8 +141,8 @@ class BoardService {
     return board;
   }
 
-  static async deleteBoard( boardId, userId ) {
-    console.log("boardId:",boardId);
+  static async deleteBoard(boardId, userId) {
+    console.log("boardId:", boardId);
     const board = await Board.findById(boardId);
     if (!board) {
       throw new Error("Board not found");
