@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Notification Bell</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f4f4f9;
+      }
+      .container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      #notification-bell {
+        position: relative;
+        cursor: pointer;
+        font-size: 30px;
+        color: #333;
+      }
+      #notification-bell .badge {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        background-color: #ff4d4f;
+        color: white;
+        border-radius: 50%;
+        padding: 5px 8px;
+        font-size: 14px;
+        font-weight: bold;
+        border: 2px solid white;
+      }
+      #notification-panel {
+        display: none;
+        position: absolute;
+        top: 40px;
+        right: 0;
+        background-color: #fff;
+        border: 1px solid #ddd;
+        padding: 15px;
+        max-width: 300px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+      }
+      .notification-item {
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+        font-size: 14px;
+      }
+      .notification-item.read {
+        color: #888;
+      }
+      .notification-item .time {
+        font-size: 12px;
+        color: #666;
+      }
+      button {
+        padding: 5px 10px;
+        background-color: #0288d1;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      button:hover {
+        background-color: #0277bd;
+      }
+      #userIdInput {
+        padding: 5px;
+        width: 200px;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <label for="userIdInput">Your User ID: </label>
+      <input type="text" id="userIdInput" placeholder="Enter your user ID" />
+      <span id="notification-bell" onclick="toggleNotifications()">
+        🔔
+        <span class="badge" style="display: none">0</span>
+      </span>
+      <div id="notification-panel">
+        <div id="notification-list"></div>
+        <button onclick="markAllAsRead()">Mark All as Read</button>
+      </div>
+    </div>
+
+    <script src="http://localhost:5000/socket.io/socket.io.js"></script>
+    <script>
+      let socket;
+      let userId;
+      let notifications = [];
+
+      function connectSocket() {
+        userId = document.getElementById("userIdInput").value.trim();
+        if (!userId) {
+          alert("Please enter your user ID");
+          return;
+        }
+
+        socket = io("http://localhost:5000", {
+          transports: ["websocket", "polling"],
+          reconnectionAttempts: 5,
+        });
+        console.log("Attempting to connect with userId:", userId);
+
+        socket.emit("register", userId);
+
+        socket.on("connect", () => {
+          socket.emit("registerUser", userId);
+          console.log("Connected to server with socket ID:", socket.id);
+        });
+
+        socket.on("connect_error", (error) => {
+          console.error("Connection error:", error.message);
+        });
+
+        socket.on("notification", (data) => {
+          console.log("Received notification:", data);
+          if (data.userId === userId) {
+            // Chỉ hiển thị nếu userId khớp
+            notifications.push({ ...data, id: Date.now(), read: false });
+            updateNotifications();
+          } else {
+            console.log(
+              `Notification ignored: userId ${data.userId} does not match ${userId}`
+            );
+          }
+        });
+      }
+
+      function toggleNotifications() {
+        const panel = document.getElementById("notification-panel");
+        panel.style.display =
+          panel.style.display === "block" ? "none" : "block";
+      }
+
+      function updateNotifications() {
+        const list = document.getElementById("notification-list");
+        list.innerHTML = "";
+        const unreadCount = notifications.filter((n) => !n.read).length;
+        const badge = document.querySelector("#notification-bell .badge");
+        badge.textContent = unreadCount;
+        badge.style.display = unreadCount > 0 ? "inline" : "none";
+
+        notifications.forEach((notif) => {
+          const div = document.createElement("div");
+          div.className = `notification-item ${notif.read ? "read" : ""}`;
+          div.innerHTML = `
+          ${notif.message}
+          <div class="time">${timeAgo(notif.timestamp)}</div>
+        `;
+          list.appendChild(div);
+        });
+      }
+
+      function markAllAsRead() {
+        notifications = notifications.map((n) => ({ ...n, read: true }));
+        updateNotifications();
+      }
+
+      function timeAgo(timestamp) {
+        const now = new Date();
+        const then = new Date(timestamp);
+        const diffMs = now - then;
+        const diffSeconds = Math.floor(diffMs / 1000);
+        const diffMinutes = Math.floor(diffSeconds / 60);
+        const diffHours = Math.floor(diffMinutes / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffSeconds < 60) return `${diffSeconds} giây trước`;
+        if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+        if (diffHours < 24) return `${diffHours} giờ trước`;
+        return `${diffDays} ngày trước`;
+      }
+
+      document
+        .getElementById("userIdInput")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter") connectSocket();
+        });
+    </script>
+  </body>
+</html>
