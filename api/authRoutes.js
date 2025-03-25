@@ -13,27 +13,25 @@ const SECRET_KEY = process.env.JWT_SECRET;
 //  Đăng ký tài khoản
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password, role, boards } = req.body;
+    const { username, email, password } = req.body;
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: "Username, email, and password are required" });
+    }
 
-    // Kiểm tra nếu email đã tồn tại
     const userExists = await User.findOne({ email });
     if (userExists)
       return res.status(400).json({ message: "Email already exists" });
 
-    // Tạo user mới
-    const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = new User({
       username,
       email,
-      password: hashedPassword,
-      role,
-      boards,
+      password
     });
     await newUser.save();
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: `Server error: ${error}` });
   }
 });
 
@@ -96,9 +94,10 @@ router.post("/forgot-password", async (req, res) => {
       expiresIn: "15m",
     });
     const clientURL = req.headers.origin;
-    const resetLink = `${clientURL}/reset-password?token=${resetToken}`;
+    const resetLink = `${clientURL}/reset-password?email=${email}&token=${resetToken}`;
     const template = loadTemplate("forgot-password-template.html", {
       RESET_LINK: resetLink,
+      EMAIL_ADDRESS: email
     });
 
     await transporter.sendMail({
@@ -118,19 +117,19 @@ router.post("/forgot-password", async (req, res) => {
 router.post("/reset-password", async (req, res) => {
   try {
     const { token, newPassword } = req.body;
-    console.log("newPassword", newPassword);
+
     const decoded = jwt.verify(token, SECRET_KEY);
 
     const user = await User.findById(decoded.userId);
 
     if (!user) return res.status(400).json({ message: "Invalid user id" });
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    user.password = newPassword;
     await user.save();
 
     res.status(200).json({ message: "Password updated successfully" });
   } catch (err) {
-    res.status(400).json({ message: "Invalid or expired token" });
+    res.status(400).json({ message: `${err}` });
   }
 });
 
@@ -148,7 +147,7 @@ router.post("/change-password", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Old password is incorrect" });
 
     // Cập nhật mật khẩu mới
-    user.password = await bcrypt.hash(newPassword, 10);
+    user.password = newPassword
     await user.save();
 
     res.status(200).json({ message: "Password changed successfully" });
