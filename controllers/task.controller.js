@@ -40,9 +40,10 @@ class TaskController {
   };
 
   deleteTask = async (req, res, next) => {
+    const userId = req.user?.userId;
     const result = new OK({
       message: "Task deleted successfully",
-      metadata: await taskService.deleteTask(req.params.id),
+      metadata: await taskService.deleteTask(req.params.id, userId),
     });
     result.send(res);
   };
@@ -69,6 +70,21 @@ class TaskController {
     } catch (error) {
       res.status(400).send(error.message);
     }
+  };
+  addCommentToTask = async (req, res) => {
+    const userId = req.user?.userId;
+    const { id } = req.params;
+    const { content } = req.body;
+
+    const result = new CREATED({
+      message: "Comment created successfully",
+      metadata: await taskService.addCommentToTask(id, {
+        content,
+        userId,
+        taskId: id,
+      }),
+    });
+    result.send(res);
   };
 }
 module.exports = new TaskController();

@@ -85,12 +85,14 @@ class ProjectController {
     result.send(res);
   };
 
+
   deleteProject = async (req, res) => {
     // const boardId = req.board?.boardId;
     const userId = req.user?.userId;
     const result = new OK({
       message: "Project deleted successfully",
       metadata: await projectService.deleteProject(req.params.id, userId),
+
     });
     result.send(res);
   };
